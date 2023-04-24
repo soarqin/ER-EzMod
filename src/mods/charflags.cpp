@@ -40,5 +40,5 @@ MOD_BEGIN(CharFlags)
         configByInt("playerHide") != 0,
         configByInt("playerSilence") != 0
     };
-    ModUtils::patch(addr + 8, (const uint8_t*)&newArray, 2);
+    ModUtils::patch(addr + 8, (const uint8_t*)&newArray2, 2);
 MOD_END(CharFlags)
