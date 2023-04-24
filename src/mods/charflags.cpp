@@ -29,5 +29,16 @@ MOD_BEGIN(CharFlags)
         configByInt("noFPCost") != 0,
         configByInt("noArrowCost") != 0
     };
-    ModUtils::patch(addr + 2, (const uint8_t*)&newArray, 7);
+    ModUtils::patch(addr, (const uint8_t*)&newArray, 7);
+#pragma pack(push, 1)
+    struct FlagArray2 {
+        uint8_t playerHide;
+        uint8_t playerSilence;
+    };
+#pragma pack(pop)
+    FlagArray2 newArray2 = {
+        configByInt("playerHide") != 0,
+        configByInt("playerSilence") != 0
+    };
+    ModUtils::patch(addr + 8, (const uint8_t*)&newArray, 2);
 MOD_END(CharFlags)
