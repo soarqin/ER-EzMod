@@ -28,7 +28,7 @@ const char *getModuleName(bool thisModule) {
     const char *moduleName = strrchr(lpFilename, '\\') + 1;
 
     if (thisModule) {
-        auto *pos = strstr(moduleName, ".dll");
+        char *pos = (char*)strstr(moduleName, ".dll");
         if (pos != nullptr) *pos = 0;
     }
 

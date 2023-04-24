@@ -22,7 +22,7 @@ MOD_BEGIN(RuneRate)
     auto mult = configByFloat("multiplier");
     if (mult != 0.0f) *(float*)&patchCodes[21] = mult;
     auto patchAddr = ModUtils::allocMemoryNear(addr, sizeof(patchCodes));
-    *(uint32_t*)&patchCodes[0x11] = addr + 0x08 - (patchAddr + 0x10 + 5);
+    *(uint32_t*)&patchCodes[0x11] = (uint32_t)(addr + 0x08 - (patchAddr + 0x10 + 5));
     memcpy((void*)patchAddr, patchCodes, sizeof(patchCodes));
     ModUtils::hookAsmManually(addr, 8, patchAddr);
 MOD_END(RuneRate)

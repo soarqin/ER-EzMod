@@ -19,7 +19,7 @@ MOD_BEGIN(DropRate)
     auto mult = configByFloat("multiplier");
     if (mult != 0.0f) *(float*)&patchCodes[16] = mult;
     auto patchAddr = ModUtils::allocMemoryNear(addr, sizeof(patchCodes));
-    *(uint32_t*)&patchCodes[0x0C] = addr + 0x07 - (patchAddr + 0x0B + 5);
+    *(uint32_t*)&patchCodes[0x0C] = (uint32_t)(addr + 0x07 - (patchAddr + 0x0B + 5));
     memcpy((void*)patchAddr, patchCodes, sizeof(patchCodes));
     ModUtils::hookAsmManually(addr, 7, patchAddr);
 MOD_END(DropRate)

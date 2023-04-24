@@ -43,8 +43,8 @@ MOD_BEGIN(NoHitbox)
     };
     auto patchAddr = ModUtils::allocMemoryNear(addr, sizeof(patchCodes));
     *(uintptr_t*)&patchCodes[2] = worldChrManFinder + 0x0A;
-    *(uint32_t*)&patchCodes[0x2A] = addr + 0x12 - (patchAddr + 0x29 + 5);
-    *(uint32_t*)&patchCodes[0x36] = addr + 0x07 - (patchAddr + 0x35 + 5);
+    *(uint32_t*)&patchCodes[0x2A] = (uint32_t)(addr + 0x12 - (patchAddr + 0x29 + 5));
+    *(uint32_t*)&patchCodes[0x36] = (uint32_t)(addr + 0x07 - (patchAddr + 0x35 + 5));
     memcpy((void*)patchAddr, patchCodes, sizeof(patchCodes));
     ModUtils::hookAsmManually(addr, 7, patchAddr);
 MOD_END(NoHitbox)

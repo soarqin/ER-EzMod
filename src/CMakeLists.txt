@@ -20,6 +20,9 @@ add_library(${PROJECT_NAME} SHARED
     mods/runerate.cpp
     mods/skipintro.cpp)
 target_compile_definitions(${PROJECT_NAME} PUBLIC INI_ALLOW_NO_VALUE=1)
+if(MSVC)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS)
+endif()
 set_target_properties(${PROJECT_NAME} PROPERTIES
     PREFIX ""
     ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
