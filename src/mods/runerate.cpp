@@ -16,7 +16,7 @@ MOD_BEGIN(RuneRate)
         0xf3, 0x0f, 0x2c, 0xf8,
         // jmp addr+8
         0xe9, 0x00, 0x00, 0x00, 0x00,
-        // run rate (as float = 2.0f)
+        // rune rate (as float = 2.0f)
         0x00, 0x00, 0x00, 0x40
     };
     auto mult = configByFloat("multiplier");
