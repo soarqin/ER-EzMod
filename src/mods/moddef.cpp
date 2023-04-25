@@ -84,6 +84,8 @@ void ModList::loadAll() {
                 }
             } else if (!strcmp(name, "order")) {
                 modLoadCarry->lastMod->setOrder(strtol(value, nullptr, 0));
+            } else if (!strcmp(name, "delay")) {
+                modLoadCarry->lastMod->setDelayed(strtol(value, nullptr, 0));
             } else {
                 modLoadCarry->lastMod->addConfig(name, value);
             }
@@ -97,10 +99,16 @@ void ModList::loadAll() {
             return strcmp((*(ModBase**)a)->name(), (*(ModBase**)b)->name());
         return orderA - orderB;
     });
+    int lastDelay = 0;
     for (size_t i = 0; i < modsSize_; i++) {
         auto *mod = mods_[i];
         if (!mod->enabled()) continue;
         ModUtils::log("Loading %s...", mod->name());
+        if (mod->order() > 0x70000000) {
+            auto delay = mod->order() - 0x70000000;
+            Sleep(delay - lastDelay);
+            lastDelay = delay;
+        }
         mod->load();
     }
     ModUtils::closeLog();

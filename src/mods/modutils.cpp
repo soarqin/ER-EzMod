@@ -279,6 +279,13 @@ inline DWORD toggleMemoryProtection(DWORD protection, uintptr_t address, size_t 
     return oldProtection;
 }
 
+// Read memory after changing the permission.
+void memReadSafe(uintptr_t addr, void *data, size_t numBytes) {
+    auto oldProt = toggleMemoryProtection(PAGE_EXECUTE_READWRITE, addr, numBytes);
+    memcpy(data, (void *)addr, numBytes);
+    toggleMemoryProtection(oldProt, addr, numBytes);
+}
+
 // Copies memory after changing the permissions at both the source and destination, so we don't get an access violation.
 void memCopySafe(uintptr_t destination, uintptr_t source, size_t numBytes) {
     auto oldProt0 = toggleMemoryProtection(PAGE_EXECUTE_READWRITE, destination, numBytes);

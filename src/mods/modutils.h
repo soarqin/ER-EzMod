@@ -36,6 +36,9 @@ bool scanAndPatch(const uint16_t *pattern, intptr_t offset, const uint8_t *newBy
 // Attempts different methods to get the main window handle.
 bool getWindowHandle();
 
+// Read memory after changing the permission.
+void memReadSafe(uintptr_t addr, void *data, size_t numBytes);
+
 // Copies memory after changing the permissions at both the source and destination, so we don't get an access violation.
 void memCopySafe(uintptr_t destination, uintptr_t source, size_t numBytes);
 

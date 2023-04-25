@@ -11,6 +11,7 @@ add_library(${PROJECT_NAME} SHARED
     # Mods
     mods/charflags.cpp
     mods/droprate.cpp
+    mods/fasterrespawn.cpp
     mods/insensible.cpp
     mods/nohitbox.cpp
     mods/noruneloss.cpp

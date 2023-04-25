@@ -5,6 +5,7 @@ Modulized mod for Elden Ring: A integrated mod that embeds some useful mods and 
 * `SkipIntro`: Skip prologue and intro.
 * `RemoveChromaticAberration`: Remove chromatic aberration.
 * `RemoveVignette`: Remove vignette.
+* `FasterRespawn`: Faster respawn fade in/out.
 * `NoRuneLoss`: No rune loss when you die.
 * `DropRate`: Set item drop rate.
 * `RuneRate`: Set rune drop rate.

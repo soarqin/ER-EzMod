@@ -13,6 +13,7 @@ public:
     inline void disable() { enabled_ = false; }
     [[nodiscard]] inline int order() const { return order_; }
     inline void setOrder(int o) { order_ = o; }
+    inline void setDelayed(int d) { order_ = 0x70000000 + d; }
     void addConfig(const char *name, const char *value);
     [[nodiscard]] const char *config(const char *name) const;
     [[nodiscard]] float configByFloat(const char *name) const;
