@@ -4,10 +4,11 @@
 #include <cstdio>
 #include <cstdint>
 
-namespace ModUtils {
+enum :uint16_t {
+    MASKED = 0xffff,
+};
 
-static constexpr int MASKED = 0xffff;
-static constexpr int PATTERN_END = 0xfffe;
+namespace ModUtils {
 
 // Gets the name of the .dll which the mod code is running in
 const char *getModuleName(bool thisModule = true);
@@ -16,22 +17,22 @@ const char *getModuleName(bool thisModule = true);
 void log(const char *msg, ...);
 
 #if defined(NDEBUG)
-#define logDebug(msg, ...)
+#define logDebug
 #else
-#define logDebug(msg, ...) log("[DEBUG] " msg, __VA_ARGS__)
+#define logDebug log
 #endif
 
 // The log should preferably be closed when code execution is finished.
 void closeLog();
 
 // Scans the whole memory of the main process module for the given signature.
-uintptr_t sigScan(const uint16_t *pattern);
+uintptr_t sigScan(const uint16_t *pattern, size_t size);
 
 // Replaces the memory at a given address with newBytes.
-void patch(uintptr_t address, const uint8_t *newBytes, size_t newBytesSize);
+void patch(uintptr_t address, const uint8_t *newBytes, size_t newBytesSize, uint8_t *oldBytes = nullptr);
 
 // Scans the whole memory of the main process module and replace
-bool scanAndPatch(const uint16_t *pattern, intptr_t offset, const uint8_t *newBytes, size_t newBytesSize);
+bool scanAndPatch(const uint16_t *pattern, size_t size, intptr_t offset, const uint8_t *newBytes, size_t newBytesSize, uint8_t *oldBytes = nullptr);
 
 // Attempts different methods to get the main window handle.
 bool getWindowHandle();
@@ -55,6 +56,6 @@ uintptr_t allocMemoryNear(uintptr_t address, size_t size);
 bool hookAsm(uintptr_t address, size_t skipBytes, uint8_t *patchCodes, size_t patchBytes);
 
 // Places a 5-byte absolutely rel-jump from A to B, run asm codes and return to A.
-bool hookAsmManually(uintptr_t address, size_t skipBytes, uintptr_t patchAddress);
+bool hookAsmManually(uintptr_t address, size_t skipBytes, uintptr_t patchAddress, uint8_t *oldBytes = nullptr);
 
 }

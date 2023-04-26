@@ -1,14 +1,13 @@
 #include "moddef.h"
 
-MOD_BEGIN(CharFlags)
+MOD_DEF(CharFlags) {
     uint16_t pattern[] = {
         0x80, 0x3D, MASKED, MASKED, MASKED, MASKED, 0x00, 0x0F,
-        0x85, MASKED, MASKED, MASKED, MASKED, 0x32, 0xC0, 0x48,
-        PATTERN_END
+        0x85, MASKED, MASKED, MASKED, MASKED, 0x32, 0xC0, 0x48
     };
-    auto addr = ModUtils::sigScan(pattern);
+    auto addr = ModUtils::sigScan(pattern, countof(pattern));
     if (addr == 0) return;
-    addr = addr + *(uint32_t*)(addr + 2) + 7;
+    addr = addr + *(uint32_t *)(addr + 2) + 7;
 #pragma pack(push, 1)
     struct FlagArray {
         uint8_t noDead;
@@ -18,6 +17,10 @@ MOD_BEGIN(CharFlags)
         uint8_t noStaminaCost;
         uint8_t noFPCost;
         uint8_t noArrowCost;
+    };
+    struct FlagArray2 {
+        uint8_t playerHide;
+        uint8_t playerSilence;
     };
 #pragma pack(pop)
     FlagArray newArray = {
@@ -29,16 +32,10 @@ MOD_BEGIN(CharFlags)
         configByInt("noFPCost") != 0,
         configByInt("noArrowCost") != 0
     };
-    ModUtils::patch(addr, (const uint8_t*)&newArray, 7);
-#pragma pack(push, 1)
-    struct FlagArray2 {
-        uint8_t playerHide;
-        uint8_t playerSilence;
-    };
-#pragma pack(pop)
+    ModUtils::patch(addr, (const uint8_t *)&newArray, 7);
     FlagArray2 newArray2 = {
         configByInt("playerHide") != 0,
         configByInt("playerSilence") != 0
     };
-    ModUtils::patch(addr + 8, (const uint8_t*)&newArray2, 2);
-MOD_END(CharFlags)
+    ModUtils::patch(addr + 8, (const uint8_t *)&newArray2, 2);
+}

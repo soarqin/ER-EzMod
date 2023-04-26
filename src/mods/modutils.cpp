@@ -122,31 +122,32 @@ inline DWORD_PTR getProcessBaseAddress(DWORD processId) {
 }
 
 // Scans the whole memory of the main process module for the given signature.
-uintptr_t sigScan(const uint16_t *pattern) {
+uintptr_t sigScan(const uint16_t *pattern, size_t size) {
     DWORD processId = GetCurrentProcessId();
-    uintptr_t regionStart = getProcessBaseAddress(processId);
+    auto *regionStart = (uint8_t*)getProcessBaseAddress(processId);
     logDebug("Scan in: %s", getModuleName(false));
     logDebug("  Process ID: %i", processId);
     logDebug("  Process base address: 0x%llX", regionStart);
 
+#if !defined(NDEBUG)
     char patternString[1024] = {0};
     size_t offset = 0;
-    size_t patternSize = 0;
-    for (const auto *bytes = pattern; offset < 1024 && *bytes != PATTERN_END; bytes++) {
-        if (*bytes == MASKED) {
+    for (size_t i = 0; i < size && offset < 1024; ++i) {
+        auto byte = pattern[i];
+        if (byte == MASKED) {
             offset += snprintf(patternString + offset, 1024 - offset, " ?");
         } else {
-            offset += snprintf(patternString + offset, 1024 - offset, " 0x%02X", *bytes);
+            offset += snprintf(patternString + offset, 1024 - offset, " 0x%02X", byte);
         }
-        ++patternSize;
     }
     logDebug("Pattern: %s", patternString);
+#endif
 
     size_t numRegionsChecked = 0;
-    uintptr_t currentAddress = 0;
+    uint8_t *currentAddress = nullptr;
     while (numRegionsChecked < 10000) {
         MEMORY_BASIC_INFORMATION memoryInfo = {nullptr};
-        if (VirtualQuery((void *)regionStart, &memoryInfo, sizeof(MEMORY_BASIC_INFORMATION)) == 0) {
+        if (VirtualQuery(regionStart, &memoryInfo, sizeof(MEMORY_BASIC_INFORMATION)) == 0) {
             DWORD error = GetLastError();
             if (error == ERROR_INVALID_PARAMETER) {
                 logDebug("Reached end of scannable memory.");
@@ -155,11 +156,11 @@ uintptr_t sigScan(const uint16_t *pattern) {
             }
             break;
         }
-        regionStart = (uintptr_t)memoryInfo.BaseAddress;
-        auto regionSize = (uintptr_t)memoryInfo.RegionSize;
-        auto regionEnd = (uintptr_t)(regionStart + regionSize);
-        auto protection = (uintptr_t)memoryInfo.Protect;
-        auto state = (uintptr_t)memoryInfo.State;
+        regionStart = (uint8_t*)memoryInfo.BaseAddress;
+        auto regionSize = (size_t)memoryInfo.RegionSize;
+        auto regionEnd = (uint8_t*)(regionStart + regionSize);
+        auto protection = memoryInfo.Protect;
+        auto state = memoryInfo.State;
 
         bool readableMemory = (
             protection == PAGE_EXECUTE_READWRITE ||
@@ -172,12 +173,12 @@ uintptr_t sigScan(const uint16_t *pattern) {
         if (readableMemory) {
             logDebug("Checking region: 0x%llX", regionStart);
             currentAddress = regionStart;
-            regionEnd -= patternSize;
+            regionEnd -= size;
             while (currentAddress < regionEnd) {
                 bool match = true;
-                for (size_t i = 0; i < patternSize; i++) {
+                for (size_t i = 0; i < size; i++) {
                     if (pattern[i] == MASKED ||
-                        *(unsigned char *)(currentAddress + i) == (unsigned char)pattern[i]) {
+                        currentAddress[i] == (unsigned char)pattern[i]) {
                         continue;
                     }
                     match = false;
@@ -185,7 +186,7 @@ uintptr_t sigScan(const uint16_t *pattern) {
                 }
                 if (match) {
                     logDebug("Found signature at 0x%llX", currentAddress);
-                    return currentAddress;
+                    return (uintptr_t)currentAddress;
                 }
                 currentAddress++;
             }
@@ -203,7 +204,7 @@ uintptr_t sigScan(const uint16_t *pattern) {
 }
 
 // Replaces the memory at a given address with newBytes.
-void patch(uintptr_t address, const uint8_t *newBytes, size_t newBytesSize) {
+void patch(uintptr_t address, const uint8_t *newBytes, size_t newBytesSize, uint8_t *oldBytes) {
     char newBytesString[1024];
     size_t offset = 0;
     size_t index = 0;
@@ -212,14 +213,15 @@ void patch(uintptr_t address, const uint8_t *newBytes, size_t newBytesSize) {
     }
     logDebug("New bytes: %s", newBytesString);
 
+    if (oldBytes) memcpy(oldBytes, (void *)address, newBytesSize);
     memcpy((void *)address, newBytes, newBytesSize);
     logDebug("Patch applied");
 }
 
-bool scanAndPatch(const uint16_t *pattern, intptr_t offset, const uint8_t *newBytes, size_t newBytesSize) {
-    auto addr = sigScan(pattern);
+bool scanAndPatch(const uint16_t *pattern, size_t size, intptr_t offset, const uint8_t *newBytes, size_t newBytesSize, uint8_t *oldBytes) {
+    auto addr = sigScan(pattern, size);
     if (addr == 0) return false;
-    patch(addr + offset, newBytes, newBytesSize);
+    patch(addr + offset, newBytes, newBytesSize, oldBytes);
     return true;
 }
 
@@ -350,13 +352,14 @@ bool hookAsm(uintptr_t address, size_t skipBytes, uint8_t *patchCodes, size_t pa
     return true;
 }
 
-bool hookAsmManually(uintptr_t address, size_t skipBytes, uintptr_t patchAddress) {
+bool hookAsmManually(uintptr_t address, size_t skipBytes, uintptr_t patchAddress, uint8_t *oldBytes) {
     if (skipBytes < 5) return true;
     logDebug("Hook JMP from 0x%llX to 0x%llX manually", address, patchAddress);
     uint8_t jmp[32];
     jmp[0] = 0xE9;
     *(uint32_t*)&jmp[1] = (uint32_t)((uintptr_t)patchAddress - address - 5);
     if (skipBytes > 5) memset(jmp + 5, 0x90, skipBytes - 5);
+    if (oldBytes) memcpy(oldBytes, (void*)address, skipBytes);
     memCopySafe(address, (uintptr_t)jmp, skipBytes);
     return true;
 }

@@ -4,6 +4,10 @@
 
 namespace Mods {
 
+#if !defined(countof)
+#define countof(n) sizeof(n) / sizeof(n[0])
+#endif
+
 class ModBase {
 public:
     virtual ~ModBase();
@@ -49,16 +53,12 @@ extern ModList modList;
 
 }
 
-#define MOD_BEGIN(N)                                        \
-class N final: Mods::ModBase {                              \
-public:                                                     \
-    N() { Mods::modList.add(this); }                        \
-    const char *name() override { return #N; }              \
-    void load() override {        \
-        constexpr auto MASKED = ModUtils::MASKED;           \
-        constexpr auto PATTERN_END = ModUtils::PATTERN_END;
-
-#define MOD_END(N)  \
-    }               \
-};                  \
-static N s##N##instance;
+#define MOD_DEF(N)                            \
+class N final: Mods::ModBase {                  \
+public:                                         \
+    N() { Mods::modList.add(this); }            \
+    const char *name() override { return #N; }  \
+    void load() override;                       \
+};                                              \
+static N s##N##instance;                        \
+void N::load()

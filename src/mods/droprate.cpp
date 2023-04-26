@@ -1,10 +1,10 @@
 #include "moddef.h"
 
-MOD_BEGIN(DropRate)
+MOD_DEF(DropRate) {
     uint16_t pattern[] = {
-        0x41, 0x0f, 0x28, 0xf8, 0x48, 0x85, 0xd2, PATTERN_END
+        0x41, 0x0f, 0x28, 0xf8, 0x48, 0x85, 0xd2
     };
-    auto addr = ModUtils::sigScan(pattern);
+    auto addr = ModUtils::sigScan(pattern, countof(pattern));
     if (addr == 0) return;
     uint8_t patchCodes[] = {
         // movss xmm7,[rip+0x8]
@@ -17,9 +17,9 @@ MOD_BEGIN(DropRate)
         0x00, 0x00, 0x7A, 0x44
     };
     auto mult = configByFloat("multiplier");
-    if (mult != 0.0f) *(float*)&patchCodes[16] = mult;
+    if (mult != 0.0f) *(float *)&patchCodes[16] = mult;
     auto patchAddr = ModUtils::allocMemoryNear(addr, sizeof(patchCodes));
-    *(uint32_t*)&patchCodes[0x0C] = (uint32_t)(addr + 0x07 - (patchAddr + 0x0B + 5));
-    memcpy((void*)patchAddr, patchCodes, sizeof(patchCodes));
+    *(uint32_t *)&patchCodes[0x0C] = (uint32_t)(addr + 0x07 - (patchAddr + 0x0B + 5));
+    memcpy((void *)patchAddr, patchCodes, sizeof(patchCodes));
     ModUtils::hookAsmManually(addr, 7, patchAddr);
-MOD_END(DropRate)
+}

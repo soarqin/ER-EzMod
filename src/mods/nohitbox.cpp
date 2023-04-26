@@ -1,17 +1,17 @@
 #include "moddef.h"
 
-MOD_BEGIN(NoHitbox)
+MOD_DEF(NoHitbox) {
     uint16_t pattern[] = {
         0x48, 0x8B, 0xFA, 0x0F, 0x11, 0x41, 0x70, 0x48,
-        0x8B, 0x05, PATTERN_END
+        0x8B, 0x05
     };
     uint16_t pattern2[] = {
         0x45, 0x0F, 0xB6, 0xCE, 0x4C, 0x8B, 0xC3, 0x48,
-        0x8B, 0xD6, 0x48, 0x8B, 0xCF, 0xE8, PATTERN_END
+        0x8B, 0xD6, 0x48, 0x8B, 0xCF, 0xE8
     };
-    auto worldChrManFinder = ModUtils::sigScan(pattern);
+    auto worldChrManFinder = ModUtils::sigScan(pattern, countof(pattern));
     if (worldChrManFinder == 0) return;
-    auto addr = ModUtils::sigScan(pattern2);
+    auto addr = ModUtils::sigScan(pattern2, sizeof(pattern2));
     if (addr == 0) return;
     uint8_t patchCodes[] = {
         // mov rdx, [worldChrManFinder+0x0A]
@@ -47,4 +47,4 @@ MOD_BEGIN(NoHitbox)
     *(uint32_t*)&patchCodes[0x36] = (uint32_t)(addr + 0x07 - (patchAddr + 0x35 + 5));
     memcpy((void*)patchAddr, patchCodes, sizeof(patchCodes));
     ModUtils::hookAsmManually(addr, 7, patchAddr);
-MOD_END(NoHitbox)
+}
