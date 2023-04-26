@@ -19,7 +19,7 @@ void log(const char *msg, ...);
 #if defined(NDEBUG)
 #define logDebug
 #else
-#define logDebug log
+#define logDebug(...) log("[DEBUG] " __VA_ARGS__)
 #endif
 
 // The log should preferably be closed when code execution is finished.

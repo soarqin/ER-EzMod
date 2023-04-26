@@ -353,10 +353,9 @@ bool hookAsm(uintptr_t address, size_t skipBytes, uint8_t *patchCodes, size_t pa
 }
 
 bool hookAsmManually(uintptr_t address, size_t skipBytes, uintptr_t patchAddress, uint8_t *oldBytes) {
-    if (skipBytes < 5) return true;
+    if (skipBytes < 5) return false;
     logDebug("Hook JMP from 0x%llX to 0x%llX manually", address, patchAddress);
-    uint8_t jmp[32];
-    jmp[0] = 0xE9;
+    uint8_t jmp[32] = {0xE9};
     *(uint32_t*)&jmp[1] = (uint32_t)((uintptr_t)patchAddress - address - 5);
     if (skipBytes > 5) memset(jmp + 5, 0x90, skipBytes - 5);
     if (oldBytes) memcpy(oldBytes, (void*)address, skipBytes);
