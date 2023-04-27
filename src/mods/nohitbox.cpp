@@ -11,7 +11,7 @@ MOD_DEF(NoHitbox) {
     };
     auto worldChrManFinder = ModUtils::sigScan(pattern, countof(pattern));
     if (worldChrManFinder == 0) return;
-    auto addr = ModUtils::sigScan(pattern2, sizeof(pattern2));
+    auto addr = ModUtils::sigScan(pattern2, countof(pattern2));
     if (addr == 0) return;
     uint8_t patchCodes[] = {
         // mov rdx, [worldChrManFinder+0x0A]

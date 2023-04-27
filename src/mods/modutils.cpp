@@ -4,6 +4,7 @@
 #include <Psapi.h>
 #include <xinput.h>
 #include <cstdarg>
+#include <share.h>
 
 namespace ModUtils {
 
@@ -52,7 +53,7 @@ void log(const char *msg, ...) {
         CreateDirectoryA("mods\\log", nullptr);
         char path[MAX_PATH];
         snprintf(path, MAX_PATH, "mods\\log\\%s.log", muModuleName);
-        fopen_s(&muLogFile, path, "w");
+        muLogFile = _fsopen(path, "w", _SH_DENYWR);
         muLogOpened = true;
     }
 
