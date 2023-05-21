@@ -24,7 +24,7 @@ MOD_DEF(FasterRespawn) {
     float oldRespawnTime2 = *(float *)(addr + 0x04);
     *(float *)addr = 0.0f;
     *(float *)(addr + 0x04) = 0.0f;
-    ModUtils::log("Respawn time patched: %g->%g %g->%g",
+    ModUtils::log(L"Respawn time patched: %g->%g %g->%g",
                   oldRespawnTime, *(float *)addr,
                   oldRespawnTime2, *(float *)(addr + 0x04));
 }

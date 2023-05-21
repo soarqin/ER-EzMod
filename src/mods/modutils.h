@@ -10,11 +10,14 @@ enum :uint16_t {
 
 namespace ModUtils {
 
+// Gets the path of the .dll which the mod code is running in
+const wchar_t *getModulePath();
+
 // Gets the name of the .dll which the mod code is running in
-const char *getModuleName(bool thisModule = true);
+const wchar_t *getModuleName();
 
 // Logs both to std::out and to a log file simultaneously
-void log(const char *msg, ...);
+void log(const wchar_t *msg, ...);
 
 #if defined(NDEBUG)
 #define logDebug

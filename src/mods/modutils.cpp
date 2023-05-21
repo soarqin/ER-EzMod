@@ -8,64 +8,72 @@
 
 namespace ModUtils {
 
-static char muModuleName[MAX_PATH] = {0};
+static wchar_t muModulePath[MAX_PATH] = {0};
+static wchar_t muModuleName[MAX_PATH] = {0};
 static HWND muWindow = nullptr;
 static FILE *muLogFile = nullptr;
 static bool muLogOpened = false;
 
 // Gets the name of the .dll which the mod code is running in
-const char *getModuleName(bool thisModule) {
-    static char lpFilename[MAX_PATH];
-    static char dummy = 'x';
+void calcModuleName() {
+    if (muModuleName[0] != 0) return;
+    static wchar_t lpFilename[MAX_PATH];
+    static wchar_t dummy = L'x';
     HMODULE module = nullptr;
 
-    if (thisModule) {
-        GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                           &dummy,
-                           &module);
-    }
+    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                       &dummy,
+                       &module);
+    GetModuleFileNameW(module, lpFilename, sizeof(lpFilename));
+    auto *moduleName = (wchar_t*)wcsrchr(lpFilename, L'\\');
+    *moduleName = 0;
+    moduleName++;
 
-    GetModuleFileNameA(module, lpFilename, sizeof(lpFilename));
-    const char *moduleName = strrchr(lpFilename, '\\') + 1;
+    auto *pos = (wchar_t*)wcsstr(moduleName, L".dll");
+    if (pos != nullptr) *pos = 0;
+    lstrcpyW(muModulePath, lpFilename);
+    lstrcpyW(muModuleName, moduleName);
+}
 
-    if (thisModule) {
-        char *pos = (char*)strstr(moduleName, ".dll");
-        if (pos != nullptr) *pos = 0;
-    }
+const wchar_t *getModulePath() {
+    calcModuleName();
+    return muModulePath;
+}
 
-    return moduleName;
+const wchar_t *getModuleName() {
+    calcModuleName();
+    return muModuleName;
 }
 
 // Gets the path to the current mod relative to the game root folder
-inline const char *getModuleFolderPath() {
-    static char lpFullPath[MAX_PATH];
-    snprintf(lpFullPath, MAX_PATH, "mods\\%s", getModuleName(true));
+inline const wchar_t *getModuleFolderPath() {
+    calcModuleName();
+
+    static wchar_t lpFullPath[MAX_PATH];
+    _snwprintf(lpFullPath, MAX_PATH, L"mods\\%s", muModuleName);
     return lpFullPath;
 }
 
 // Logs both to std::out and to a log file simultaneously
-void log(const char *msg, ...) {
-    if (muModuleName[0] == 0) {
-        lstrcpyA(muModuleName, getModuleName(true));
-    }
+void log(const wchar_t *msg, ...) {
+    calcModuleName();
 
     if (muLogFile == nullptr && !muLogOpened) {
-        CreateDirectoryA("mods\\log", nullptr);
-        char path[MAX_PATH];
-        snprintf(path, MAX_PATH, "mods\\log\\%s.log", muModuleName);
-        muLogFile = _fsopen(path, "w", _SH_DENYWR);
+        wchar_t path[MAX_PATH];
+        _snwprintf(path, MAX_PATH, L"%s\\%s.log", muModulePath, muModuleName);
+        muLogFile = _wfsopen(path, L"w", _SH_DENYWR);
         muLogOpened = true;
     }
 
     va_list args;
     va_start(args, msg);
-    printf("%s > ", muModuleName);
-    vprintf(msg, args);
-    printf("\n");
+    wprintf(L"%s > ", muModuleName);
+    vwprintf(msg, args);
+    wprintf(L"\n");
     if (muLogFile != nullptr) {
-        fprintf(muLogFile, "%s > ", muModuleName);
-        vfprintf(muLogFile, msg, args);
-        fprintf(muLogFile, "\n");
+        fwprintf(muLogFile, L"%s > ", muModuleName);
+        vfwprintf(muLogFile, msg, args);
+        fwprintf(muLogFile, L"\n");
         fflush(muLogFile);
     }
     va_end(args);
@@ -80,12 +88,9 @@ void closeLog() {
 }
 
 // Shows a popup with a warning and logs that same warning.
-inline void raiseError(const char *error) {
-    if (muModuleName[0] == 0) {
-        lstrcpyA(muModuleName, getModuleName(true));
-    }
-    logDebug("Raised error: %s", error);
-    MessageBox(nullptr, error, muModuleName, MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
+inline void raiseError(const wchar_t *error) {
+    logDebug(L"Raised error: %s", error);
+    MessageBoxW(nullptr, error, muModuleName, MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
 }
 
 // Gets the base address of the game's memory.
@@ -126,9 +131,9 @@ inline DWORD_PTR getProcessBaseAddress(DWORD processId) {
 uintptr_t sigScan(const uint16_t *pattern, size_t size) {
     DWORD processId = GetCurrentProcessId();
     auto *regionStart = (uint8_t*)getProcessBaseAddress(processId);
-    logDebug("Scan in: %s", getModuleName(false));
-    logDebug("  Process ID: %i", processId);
-    logDebug("  Process base address: 0x%llX", regionStart);
+    logDebug(L"Scan in exe:");
+    logDebug(L"  Process ID: %i", processId);
+    logDebug(L"  Process base address: 0x%llX", regionStart);
 
 #if !defined(NDEBUG)
     char patternString[1024] = {0};
@@ -141,7 +146,7 @@ uintptr_t sigScan(const uint16_t *pattern, size_t size) {
             offset += snprintf(patternString + offset, 1024 - offset, " 0x%02X", byte);
         }
     }
-    logDebug("Pattern: %s", patternString);
+    logDebug(L"Pattern: %s", patternString);
 #endif
 
     size_t numRegionsChecked = 0;
@@ -151,9 +156,9 @@ uintptr_t sigScan(const uint16_t *pattern, size_t size) {
         if (VirtualQuery(regionStart, &memoryInfo, sizeof(MEMORY_BASIC_INFORMATION)) == 0) {
             DWORD error = GetLastError();
             if (error == ERROR_INVALID_PARAMETER) {
-                logDebug("Reached end of scannable memory.");
+                logDebug(L"Reached end of scannable memory.");
             } else {
-                logDebug("VirtualQuery failed, error code: %i.", error);
+                logDebug(L"VirtualQuery failed, error code: %i.", error);
             }
             break;
         }
@@ -172,7 +177,7 @@ uintptr_t sigScan(const uint16_t *pattern, size_t size) {
             && state == MEM_COMMIT;
 
         if (readableMemory) {
-            logDebug("Checking region: 0x%llX", regionStart);
+            logDebug(L"Checking region: 0x%llX", regionStart);
             currentAddress = regionStart;
             regionEnd -= size;
             while (currentAddress < regionEnd) {
@@ -186,21 +191,21 @@ uintptr_t sigScan(const uint16_t *pattern, size_t size) {
                     break;
                 }
                 if (match) {
-                    logDebug("Found signature at 0x%llX", currentAddress);
+                    logDebug(L"Found signature at 0x%llX", currentAddress);
                     return (uintptr_t)currentAddress;
                 }
                 currentAddress++;
             }
         } else {
-            logDebug("Skipped region: 0x%llX", regionStart);
+            logDebug(L"Skipped region: 0x%llX", regionStart);
         }
 
         numRegionsChecked++;
         regionStart += memoryInfo.RegionSize;
     }
 
-    logDebug("Stopped at: 0x%llX, num regions checked: %i", currentAddress, numRegionsChecked);
-    raiseError("Could not find signature!");
+    logDebug(L"Stopped at: 0x%llX, num regions checked: %i", currentAddress, numRegionsChecked);
+    raiseError(L"Could not find signature!");
     return 0;
 }
 
@@ -212,11 +217,11 @@ void patch(uintptr_t address, const uint8_t *newBytes, size_t newBytesSize, uint
     for (const auto *bytes = newBytes; offset < 1024 && index < newBytesSize; index++) {
         offset += snprintf(newBytesString + offset, 1024 - offset, " 0x%02X", bytes[index]);
     }
-    logDebug("New bytes: %s", newBytesString);
+    logDebug(L"New bytes: %s", newBytesString);
 
     if (oldBytes) memcpy(oldBytes, (void *)address, newBytesSize);
     memcpy((void *)address, newBytes, newBytesSize);
-    logDebug("Patch applied");
+    logDebug(L"Patch applied");
 }
 
 bool scanAndPatch(const uint16_t *pattern, size_t size, intptr_t offset, const uint8_t *newBytes, size_t newBytesSize, uint8_t *oldBytes) {
@@ -233,9 +238,9 @@ inline BOOL CALLBACK enumWindowHandles(HWND hwnd, LPARAM) {
     if (processId == GetCurrentProcessId()) {
         char buffer[100];
         GetWindowTextA(hwnd, buffer, 100);
-        logDebug("Found window belonging to ER: %s", buffer);
+        logDebug(L"Found window belonging to ER: %s", buffer);
         if (strstr(buffer, "ELDEN RING") != nullptr) {
-            logDebug("%s handle selected", buffer);
+            logDebug(L"%s handle selected", buffer);
             muWindow = hwnd;
             return false;
         }
@@ -245,7 +250,7 @@ inline BOOL CALLBACK enumWindowHandles(HWND hwnd, LPARAM) {
 
 // Attempts different methods to get the main window handle.
 bool getWindowHandle() {
-    logDebug("Finding application window...");
+    logDebug(L"Finding application window...");
 
     for (size_t i = 0; i < 10000; i++) {
         HWND hwnd = FindWindowExW(nullptr, nullptr, nullptr, L"ELDEN RING™");
@@ -253,7 +258,7 @@ bool getWindowHandle() {
         GetWindowThreadProcessId(hwnd, &processId);
         if (processId == GetCurrentProcessId()) {
             muWindow = hwnd;
-            logDebug("FindWindowExA: found window handle");
+            logDebug(L"FindWindowExA: found window handle");
             break;
         }
         Sleep(1);
@@ -261,7 +266,7 @@ bool getWindowHandle() {
 
     // Backup method
     if (muWindow == nullptr) {
-        logDebug("Enumerating windows...");
+        logDebug(L"Enumerating windows...");
         for (size_t i = 0; i < 10000; i++) {
             EnumWindows(&enumWindowHandles, 0L);
             if (muWindow != nullptr) {
@@ -321,7 +326,7 @@ uintptr_t allocMemoryNear(uintptr_t address, size_t size) {
     LPVOID allocAddr;
     size_t step = size > 0x1000 ? (size + 0xFFFU) & ~0xFFFU : 0x1000U;
     while (newAddr < endAddr) {
-        logDebug("Trying to alloc 0x%llX", newAddr);
+        logDebug(L"Trying to alloc 0x%llX", newAddr);
         allocAddr = VirtualAlloc((LPVOID)newAddr,
                                  size,
                                  MEM_RESERVE | MEM_COMMIT,
@@ -337,10 +342,10 @@ bool hookAsm(uintptr_t address, size_t skipBytes, uint8_t *patchCodes, size_t pa
     if (skipBytes < 5) return false;
     uintptr_t allocAddr = allocMemoryNear(address, patchBytes + 5);
     if (!allocAddr) {
-        logDebug("Unable to allocate memory for hook");
+        logDebug(L"Unable to allocate memory for hook");
         return false;
     }
-    logDebug("Hook JMP from 0x%llX to 0x%llX", address, allocAddr);
+    logDebug(L"Hook JMP from 0x%llX to 0x%llX", address, allocAddr);
     uint8_t jmp[32];
     jmp[0] = 0xE9;
     *(uint32_t*)&jmp[1] = (uint32_t)((uintptr_t)allocAddr - address - 5);
@@ -355,7 +360,7 @@ bool hookAsm(uintptr_t address, size_t skipBytes, uint8_t *patchCodes, size_t pa
 
 bool hookAsmManually(uintptr_t address, size_t skipBytes, uintptr_t patchAddress, uint8_t *oldBytes) {
     if (skipBytes < 5) return false;
-    logDebug("Hook JMP from 0x%llX to 0x%llX manually", address, patchAddress);
+    logDebug(L"Hook JMP from 0x%llX to 0x%llX manually", address, patchAddress);
     uint8_t jmp[32] = {0xE9};
     *(uint32_t*)&jmp[1] = (uint32_t)((uintptr_t)patchAddress - address - 5);
     if (skipBytes > 5) memset(jmp + 5, 0x90, skipBytes - 5);
@@ -376,9 +381,9 @@ inline bool IsKeyPressed(const std::vector<unsigned short> &keys,
         if (GetWindowHandle()) {
             char buffer[100];
             GetWindowTextA(muWindow, buffer, 100);
-            logDebug("Found application window: %s", buffer);
+            logDebug(L"Found application window: %s", buffer);
         } else {
-            logDebug("Failed to get window handle, inputs will be detected globally");
+            logDebug(L"Failed to get window handle, inputs will be detected globally");
         }
         retrievedWindowHandle = true;
     }

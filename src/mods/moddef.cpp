@@ -56,10 +56,12 @@ void ModList::loadAll() {
         const char *lastSection;
         ModBase *lastMod;
     } modLoadCarry = { nullptr, nullptr };
-    char path[MAX_PATH];
-    snprintf(path, MAX_PATH, "mods\\config\\%s.ini", ModUtils::getModuleName(true));
-    ModUtils::log("Loading config file: %s", path);
-    ini_parse(path, [](void *userp, const char *section, const char *name, const char *value) {
+    wchar_t path[MAX_PATH];
+    _snwprintf(path, MAX_PATH, L"%s\\%s.ini", ModUtils::getModulePath(), ModUtils::getModuleName());
+    ModUtils::log(L"Loading config file: %s", path);
+    FILE *f = _wfopen(path, L"r");
+    if (f == nullptr) return;
+    ini_parse_file(f, [](void *userp, const char *section, const char *name, const char *value) {
         auto *modLoadCarry = (ModLoadCarry*)userp;
         if (modLoadCarry->lastSection == nullptr || !strcmp(modLoadCarry->lastSection, section)) {
             modLoadCarry->lastSection = section;
@@ -74,7 +76,7 @@ void ModList::loadAll() {
             }
             if (!found) {
                 modLoadCarry->lastMod = nullptr;
-                ModUtils::log("Mod %s not found, skipping...", section);
+                ModUtils::log(L"Mod %s not found, skipping...", section);
             }
         }
         if (modLoadCarry->lastMod) {
@@ -92,6 +94,7 @@ void ModList::loadAll() {
         }
         return 1;
     }, &modLoadCarry);
+    fclose(f);
     qsort(mods_, modsSize_, sizeof(ModBase *), [](const void *a, const void *b) {
         auto orderA = (*(ModBase**)a)->order();
         auto orderB = (*(ModBase**)b)->order();
@@ -103,7 +106,7 @@ void ModList::loadAll() {
     for (size_t i = 0; i < modsSize_; i++) {
         auto *mod = mods_[i];
         if (!mod->enabled()) continue;
-        ModUtils::log("Loading %s...", mod->name());
+        ModUtils::log(L"Loading %S...", mod->name());
         if (mod->order() > 0x70000000) {
             auto delay = mod->order() - 0x70000000;
             Sleep(delay - lastDelay);

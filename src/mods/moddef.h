@@ -53,7 +53,7 @@ extern ModList modList;
 
 }
 
-#define MOD_DEF(N)                            \
+#define MOD_DEF(N)                              \
 class N final: Mods::ModBase {                  \
 public:                                         \
     N() { Mods::modList.add(this); }            \
