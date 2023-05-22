@@ -13,6 +13,7 @@ public:
     virtual ~ModBase();
     virtual const char *name() = 0;
     virtual void load() = 0;
+    virtual void unload() = 0;
     [[nodiscard]] bool enabled() const { return enabled_; }
     inline void disable() { enabled_ = false; }
     [[nodiscard]] inline int order() const { return order_; }
@@ -53,12 +54,16 @@ extern ModList modList;
 
 }
 
-#define MOD_DEF(N)                              \
+#define MOD_LOAD(N)                             \
 class N final: Mods::ModBase {                  \
 public:                                         \
     N() { Mods::modList.add(this); }            \
     const char *name() override { return #N; }  \
     void load() override;                       \
+    void unload() override;                     \
 };                                              \
 static N s##N##instance;                        \
 void N::load()
+
+#define MOD_UNLOAD(N) \
+void N::unload()

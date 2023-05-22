@@ -1,6 +1,6 @@
 #include "moddef.h"
 
-MOD_DEF(CharFlags) {
+MOD_LOAD(CharFlags) {
     uint16_t pattern[] = {
         0x80, 0x3D, MASKED, MASKED, MASKED, MASKED, 0x00, 0x0F,
         0x85, MASKED, MASKED, MASKED, MASKED, 0x32, 0xC0, 0x48
@@ -38,4 +38,7 @@ MOD_DEF(CharFlags) {
         configByInt("playerSilence") != 0
     };
     ModUtils::patch(addr + 8, (const uint8_t *)&newArray2, 2);
+}
+
+MOD_UNLOAD(CharFlags) {
 }

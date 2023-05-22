@@ -1,6 +1,6 @@
 #include "moddef.h"
 
-MOD_DEF(RuneRate) {
+MOD_LOAD(RuneRate) {
     uint16_t pattern[] = {
         0xf3, 0x0f, 0x59, 0xc1, 0xf3, 0x0f, 0x2c, 0xf8,
         0x48, 0x8b, 0x8b
@@ -25,4 +25,7 @@ MOD_DEF(RuneRate) {
     *(uint32_t *)&patchCodes[0x11] = (uint32_t)(addr + 0x08 - (patchAddr + 0x10 + 5));
     memcpy((void *)patchAddr, patchCodes, sizeof(patchCodes));
     ModUtils::hookAsmManually(addr, 8, patchAddr);
+}
+
+MOD_UNLOAD(RuneRate) {
 }

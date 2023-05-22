@@ -1,6 +1,6 @@
 #include "moddef.h"
 
-MOD_DEF(NoHitbox) {
+MOD_LOAD(NoHitbox) {
     uint16_t pattern[] = {
         0x48, 0x8B, 0xFA, 0x0F, 0x11, 0x41, 0x70, 0x48,
         0x8B, 0x05
@@ -47,4 +47,7 @@ MOD_DEF(NoHitbox) {
     *(uint32_t*)&patchCodes[0x36] = (uint32_t)(addr + 0x07 - (patchAddr + 0x35 + 5));
     memcpy((void*)patchAddr, patchCodes, sizeof(patchCodes));
     ModUtils::hookAsmManually(addr, 7, patchAddr);
+}
+
+MOD_UNLOAD(NoHitbox) {
 }

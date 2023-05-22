@@ -1,6 +1,6 @@
 #include "moddef.h"
 
-MOD_DEF(RideAnywhere) {
+MOD_LOAD(RideAnywhere) {
     uint16_t pattern[] = {
         0x80, MASKED, MASKED, MASKED, MASKED, MASKED, MASKED, 0x48,
         MASKED, MASKED, MASKED, MASKED, 0x48, MASKED, MASKED, MASKED,
@@ -17,4 +17,7 @@ MOD_DEF(RideAnywhere) {
     };
     uint8_t oldBytes[sizeof(newBytes)];
     ModUtils::scanAndPatch(pattern, countof(pattern), 0, newBytes, sizeof(newBytes), oldBytes);
+}
+
+MOD_UNLOAD(RideAnywhere) {
 }

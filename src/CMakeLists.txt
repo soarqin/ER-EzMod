@@ -19,7 +19,7 @@ add_library(${PROJECT_NAME} SHARED
     mods/removevignette.cpp
     mods/rideanywhere.cpp
     mods/runerate.cpp
-    mods/skipintro.cpp)
+    mods/skipintro.cpp mods/input.cpp mods/input.h)
 target_compile_definitions(${PROJECT_NAME} PUBLIC INI_ALLOW_NO_VALUE=1)
 if(MSVC)
     target_compile_definitions(${PROJECT_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS)

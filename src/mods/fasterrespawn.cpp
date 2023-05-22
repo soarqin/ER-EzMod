@@ -1,6 +1,6 @@
 #include "moddef.h"
 
-MOD_DEF(FasterRespawn) {
+MOD_LOAD(FasterRespawn) {
     uint16_t pattern[] = {
         0x48, 0x89, 0x5C, 0x24, 0x48, 0x8B, 0xFA, 0x48,
         0x8B, 0xD9, 0xC7, 0x44, 0x24, 0x20, 0x00, 0x00,
@@ -26,4 +26,7 @@ MOD_DEF(FasterRespawn) {
     ModUtils::log(L"Respawn time patched: %g->%g %g->%g",
                   oldRespawnTime, *(float *)addr,
                   oldRespawnTime2, *(float *)(addr + 0x04));
+}
+
+MOD_UNLOAD(FasterRespawn) {
 }
