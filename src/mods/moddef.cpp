@@ -53,9 +53,11 @@ void ModList::add(ModBase *mod) {
 
 void ModList::loadAll() {
     struct ModLoadCarry {
-        const char *lastSection;
+        char lastSection[64];
         ModBase *lastMod;
-    } modLoadCarry = { nullptr, nullptr };
+        bool isCommon;
+        uint32_t delayInMs;
+    } modLoadCarry = { {0}, nullptr, false, 0 };
     wchar_t path[MAX_PATH];
     _snwprintf(path, MAX_PATH, L"%s\\%s.ini", ModUtils::getModulePath(), ModUtils::getModuleName());
     ModUtils::log(L"Loading config file: %s", path);
@@ -63,23 +65,33 @@ void ModList::loadAll() {
     if (f == nullptr) return;
     ini_parse_file(f, [](void *userp, const char *section, const char *name, const char *value) {
         auto *modLoadCarry = (ModLoadCarry*)userp;
-        if (modLoadCarry->lastSection == nullptr || !strcmp(modLoadCarry->lastSection, section)) {
-            modLoadCarry->lastSection = section;
-            bool found = false;
-            for (size_t i = 0; i < modList.modsSize_; i++) {
-                auto *mod = modList.mods_[i];
-                if (!strcmp(mod->name(), section)) {
-                    modLoadCarry->lastMod = mod;
-                    found = true;
-                    break;
+        if (modLoadCarry->lastSection[0] == 0 || strcmp(modLoadCarry->lastSection, section) != 0) {
+            strncpy(modLoadCarry->lastSection, section, 64);
+            if (strcmp(section, "EzMod") == 0) {
+                modLoadCarry->isCommon = true;
+                modLoadCarry->lastMod = nullptr;
+            } else {
+                modLoadCarry->isCommon = false;
+                bool found = false;
+                for (size_t i = 0; i < modList.modsSize_; i++) {
+                    auto *mod = modList.mods_[i];
+                    if (!strcmp(mod->name(), section)) {
+                        modLoadCarry->lastMod = mod;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    modLoadCarry->lastMod = nullptr;
+                    ModUtils::log(L"Mod %S not found, skipping...", section);
                 }
             }
-            if (!found) {
-                modLoadCarry->lastMod = nullptr;
-                ModUtils::log(L"Mod %s not found, skipping...", section);
-            }
         }
-        if (modLoadCarry->lastMod) {
+        if (modLoadCarry->isCommon) {
+            if (!strcmp(name, "delay")) {
+                modLoadCarry->delayInMs = strtoul(value, nullptr, 0);
+            }
+        } else if (modLoadCarry->lastMod) {
             if (!strcmp(name, "enabled")) {
                 if (!strcmp(value, "0") || !strcmp(value, "false")) {
                     modLoadCarry->lastMod->disable();
@@ -102,16 +114,24 @@ void ModList::loadAll() {
             return strcmp((*(ModBase**)a)->name(), (*(ModBase**)b)->name());
         return orderA - orderB;
     });
+    if (modLoadCarry.delayInMs) {
+        ModUtils::log(L"Delay %u ms for mod loading...", modLoadCarry.delayInMs);
+        Sleep(modLoadCarry.delayInMs);
+    }
     int lastDelay = 0;
     for (size_t i = 0; i < modsSize_; i++) {
         auto *mod = mods_[i];
         if (!mod->enabled()) continue;
-        ModUtils::log(L"Loading %S...", mod->name());
         if (mod->order() > 0x70000000) {
             auto delay = mod->order() - 0x70000000;
-            Sleep(delay - lastDelay);
+            auto d = delay - lastDelay;
+            if (d) {
+                ModUtils::log(L"Delay %d ms for %S...", d, mod->name());
+                Sleep(d);
+            }
             lastDelay = delay;
         }
+        ModUtils::log(L"Loading %S...", mod->name());
         mod->load();
     }
     ModUtils::closeLog();

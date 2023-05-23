@@ -89,7 +89,7 @@ void closeLog() {
 
 // Shows a popup with a warning and logs that same warning.
 inline void raiseError(const wchar_t *error) {
-    logDebug(L"Raised error: %s", error);
+    log(L"Raised error: %s", error);
     MessageBoxW(nullptr, error, muModuleName, MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
 }
 
