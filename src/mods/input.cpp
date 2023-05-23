@@ -186,7 +186,7 @@ struct VKeyDef {
 
 uint16_t mapKeyFromName(const char *name) {
 #if defined(_MSC_VER) && !defined(strcasecmp)
-#define strcasecmp stricmp
+#define strcasecmp _stricmp
 #endif
     for (auto &kd: vkeyTable) {
         if (strcasecmp(kd.name, name) == 0) {

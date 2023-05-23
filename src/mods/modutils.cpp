@@ -224,11 +224,11 @@ void patch(uintptr_t address, const uint8_t *newBytes, size_t newBytesSize, uint
     logDebug(L"Patch applied");
 }
 
-bool scanAndPatch(const uint16_t *pattern, size_t size, intptr_t offset, const uint8_t *newBytes, size_t newBytesSize, uint8_t *oldBytes) {
+uintptr_t scanAndPatch(const uint16_t *pattern, size_t size, intptr_t offset, const uint8_t *newBytes, size_t newBytesSize, uint8_t *oldBytes) {
     auto addr = sigScan(pattern, size);
-    if (addr == 0) return false;
+    if (addr == 0) return 0;
     patch(addr + offset, newBytes, newBytesSize, oldBytes);
-    return true;
+    return addr + offset;
 }
 
 // Winapi callback that receives all active window handles one by one.
@@ -335,6 +335,11 @@ uintptr_t allocMemoryNear(uintptr_t address, size_t size) {
         newAddr += step;
     }
     return (uintptr_t)allocAddr;
+}
+
+// Free memory block
+void freeMemory(uintptr_t address) {
+    VirtualFree((LPVOID)address, 0, MEM_RELEASE);
 }
 
 // Places a 5-byte absolutely rel-jump from A to B, run asm codes and return to A.

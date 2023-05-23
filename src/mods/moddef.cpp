@@ -102,7 +102,7 @@ void ModList::loadAll() {
                 modLoadCarry->lastMod->setDelayed(strtol(value, nullptr, 0));
             } else {
                 modLoadCarry->lastMod->addConfig(name, value);
-            }star
+            }
         }
         return 1;
     }, &modLoadCarry);
