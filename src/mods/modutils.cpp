@@ -5,6 +5,7 @@
 #include <xinput.h>
 #include <cstdarg>
 #include <share.h>
+#include <cctype>
 
 namespace ModUtils {
 
@@ -50,7 +51,7 @@ inline const wchar_t *getModuleFolderPath() {
     calcModuleName();
 
     static wchar_t lpFullPath[MAX_PATH];
-    _snwprintf(lpFullPath, MAX_PATH, L"mods\\%s", muModuleName);
+    _snwprintf(lpFullPath, MAX_PATH, L"mods\\%ls", muModuleName);
     return lpFullPath;
 }
 
@@ -60,18 +61,18 @@ void log(const wchar_t *msg, ...) {
 
     if (muLogFile == nullptr && !muLogOpened) {
         wchar_t path[MAX_PATH];
-        _snwprintf(path, MAX_PATH, L"%s\\%s.log", muModulePath, muModuleName);
+        _snwprintf(path, MAX_PATH, L"%ls\\%ls.log", muModulePath, muModuleName);
         muLogFile = _wfsopen(path, L"w", _SH_DENYWR);
         muLogOpened = true;
     }
 
     va_list args;
     va_start(args, msg);
-    wprintf(L"%s > ", muModuleName);
+    wprintf(L"%ls > ", muModuleName);
     vwprintf(msg, args);
     wprintf(L"\n");
     if (muLogFile != nullptr) {
-        fwprintf(muLogFile, L"%s > ", muModuleName);
+        fwprintf(muLogFile, L"%ls > ", muModuleName);
         vfwprintf(muLogFile, msg, args);
         fwprintf(muLogFile, L"\n");
         fflush(muLogFile);
@@ -89,7 +90,7 @@ void closeLog() {
 
 // Shows a popup with a warning and logs that same warning.
 inline void raiseError(const wchar_t *error) {
-    log(L"Raised error: %s", error);
+    log(L"Raised error: %ls", error);
     MessageBoxW(nullptr, error, muModuleName, MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
 }
 
@@ -146,7 +147,7 @@ uintptr_t sigScan(const uint16_t *pattern, size_t size) {
             offset += snprintf(patternString + offset, 1024 - offset, " 0x%02X", byte);
         }
     }
-    logDebug(L"Pattern: %s", patternString);
+    logDebug(L"Pattern: %hs", patternString);
 #endif
 
     size_t numRegionsChecked = 0;
@@ -217,7 +218,7 @@ void patch(uintptr_t address, const uint8_t *newBytes, size_t newBytesSize, uint
     for (const auto *bytes = newBytes; offset < 1024 && index < newBytesSize; index++) {
         offset += snprintf(newBytesString + offset, 1024 - offset, " 0x%02X", bytes[index]);
     }
-    logDebug(L"New bytes: %s", newBytesString);
+    logDebug(L"New bytes: %hs", newBytesString);
 
     if (oldBytes) memcpy(oldBytes, (void *)address, newBytesSize);
     memcpy((void *)address, newBytes, newBytesSize);
@@ -236,11 +237,11 @@ inline BOOL CALLBACK enumWindowHandles(HWND hwnd, LPARAM) {
     DWORD processId = 0;
     GetWindowThreadProcessId(hwnd, &processId);
     if (processId == GetCurrentProcessId()) {
-        char buffer[100];
-        GetWindowTextA(hwnd, buffer, 100);
-        logDebug(L"Found window belonging to ER: %s", buffer);
-        if (strstr(buffer, "ELDEN RING") != nullptr) {
-            logDebug(L"%s handle selected", buffer);
+        wchar_t buffer[100];
+        GetWindowTextW(hwnd, buffer, 100);
+        logDebug(L"Found window belonging to ER: %ls", buffer);
+        if (wcsstr(buffer, L"ELDEN RING") != nullptr) {
+            logDebug(L"%ls handle selected", buffer);
             muWindow = hwnd;
             return false;
         }
@@ -374,75 +375,234 @@ bool hookAsmManually(uintptr_t address, size_t skipBytes, uintptr_t patchAddress
     return true;
 }
 
-/*
-// Checks if a keyboard or controller key is pressed.
-inline bool IsKeyPressed(const std::vector<unsigned short> &keys,
-                         bool falseWhileHolding = true,
-                         bool checkController = false) {
-    static std::vector<std::vector<unsigned short>> notReleasedKeys;
-    static bool retrievedWindowHandle = false;
 
-    if (!retrievedWindowHandle) {
-        if (GetWindowHandle()) {
-            char buffer[100];
-            GetWindowTextA(muWindow, buffer, 100);
-            logDebug(L"Found application window: %s", buffer);
-        } else {
-            logDebug(L"Failed to get window handle, inputs will be detected globally");
+uint32_t mapStringToVKey(const char *name, uint32_t &mods) {
+    struct KeyMap {
+        const char *name;
+        uint32_t keyId;
+    };
+    static const KeyMap sModMap[] = {
+        {"SHIFT", MOD_SHIFT},
+        {"CONTROL", MOD_CONTROL},
+        {"CTRL", MOD_CONTROL},
+        {"ALT", MOD_ALT},
+        {"WIN", MOD_WIN},
+    };
+
+    static const KeyMap sVKeyMap[] = {
+        {"LBUTTON", VK_LBUTTON},
+        {"RBUTTON", VK_RBUTTON},
+        {"CANCEL", VK_CANCEL},
+        {"MBUTTON", VK_MBUTTON},
+        {"XBUTTON1", VK_XBUTTON1},
+        {"XBUTTON2", VK_XBUTTON2},
+        {"BACK", VK_BACK},
+        {"BACKSPACE", VK_BACK},
+        {"TAB", VK_TAB},
+        {"CLEAR", VK_CLEAR},
+        {"RETURN", VK_RETURN},
+        {"ENTER", VK_RETURN},
+        {"PAUSE", VK_PAUSE},
+        {"CAPITAL", VK_CAPITAL},
+        {"CAPSLOCK", VK_CAPITAL},
+        {"KANA", VK_KANA},
+        {"HANGUL", VK_HANGUL},
+        {"JUNJA", VK_JUNJA},
+        {"FINAL", VK_FINAL},
+        {"HANJA", VK_HANJA},
+        {"KANJI", VK_KANJI},
+        {"ESCAPE", VK_ESCAPE},
+        {"ESC", VK_ESCAPE},
+        {"CONVERT", VK_CONVERT},
+        {"NONCONVERT", VK_NONCONVERT},
+        {"ACCEPT", VK_ACCEPT},
+        {"MODECHANGE", VK_MODECHANGE},
+        {"SPACE", VK_SPACE},
+        {"PRIOR", VK_PRIOR},
+        {"NEXT", VK_NEXT},
+        {"END", VK_END},
+        {"HOME", VK_HOME},
+        {"LEFT", VK_LEFT},
+        {"UP", VK_UP},
+        {"RIGHT", VK_RIGHT},
+        {"DOWN", VK_DOWN},
+        {"SELECT", VK_SELECT},
+        {"PRINT", VK_PRINT},
+        {"EXECUTE", VK_EXECUTE},
+        {"SNAPSHOT", VK_SNAPSHOT},
+        {"INSERT", VK_INSERT},
+        {"DELETE", VK_DELETE},
+        {"HELP", VK_HELP},
+        {"0", 0x30},
+        {"1", 0x31},
+        {"2", 0x32},
+        {"3", 0x33},
+        {"4", 0x34},
+        {"5", 0x35},
+        {"6", 0x36},
+        {"7", 0x37},
+        {"8", 0x38},
+        {"9", 0x39},
+        {"A", 0x41},
+        {"B", 0x42},
+        {"C", 0x43},
+        {"D", 0x44},
+        {"E", 0x45},
+        {"F", 0x46},
+        {"G", 0x47},
+        {"H", 0x48},
+        {"I", 0x49},
+        {"J", 0x4A},
+        {"K", 0x4B},
+        {"L", 0x4C},
+        {"M", 0x4D},
+        {"N", 0x4E},
+        {"O", 0x4F},
+        {"P", 0x50},
+        {"Q", 0x51},
+        {"R", 0x52},
+        {"S", 0x53},
+        {"T", 0x54},
+        {"U", 0x55},
+        {"V", 0x56},
+        {"W", 0x57},
+        {"X", 0x58},
+        {"Y", 0x59},
+        {"Z", 0x5A},
+        {"APPS", VK_APPS},
+        {"SLEEP", VK_SLEEP},
+        {"NUMPAD0", VK_NUMPAD0},
+        {"NUMPAD1", VK_NUMPAD1},
+        {"NUMPAD2", VK_NUMPAD2},
+        {"NUMPAD3", VK_NUMPAD3},
+        {"NUMPAD4", VK_NUMPAD4},
+        {"NUMPAD5", VK_NUMPAD5},
+        {"NUMPAD6", VK_NUMPAD6},
+        {"NUMPAD7", VK_NUMPAD7},
+        {"NUMPAD8", VK_NUMPAD8},
+        {"NUMPAD9", VK_NUMPAD9},
+        {"NUM0", VK_NUMPAD0},
+        {"NUM1", VK_NUMPAD1},
+        {"NUM2", VK_NUMPAD2},
+        {"NUM3", VK_NUMPAD3},
+        {"NUM4", VK_NUMPAD4},
+        {"NUM5", VK_NUMPAD5},
+        {"NUM6", VK_NUMPAD6},
+        {"NUM7", VK_NUMPAD7},
+        {"NUM8", VK_NUMPAD8},
+        {"NUM9", VK_NUMPAD9},
+        {"MULTIPLY", VK_MULTIPLY},
+        {"ADD", VK_ADD},
+        {"SUBTRACT", VK_SUBTRACT},
+        {"MINUS", VK_SUBTRACT},
+        {"DECIMAL", VK_DECIMAL},
+        {"DIVIDE", VK_DIVIDE},
+        {"F1", VK_F1},
+        {"F2", VK_F2},
+        {"F3", VK_F3},
+        {"F4", VK_F4},
+        {"F5", VK_F5},
+        {"F6", VK_F6},
+        {"F7", VK_F7},
+        {"F8", VK_F8},
+        {"F9", VK_F9},
+        {"F10", VK_F10},
+        {"F11", VK_F11},
+        {"F12", VK_F12},
+        {"F13", VK_F13},
+        {"F14", VK_F14},
+        {"F15", VK_F15},
+        {"F16", VK_F16},
+        {"F17", VK_F17},
+        {"F18", VK_F18},
+        {"F19", VK_F19},
+        {"F20", VK_F20},
+        {"F21", VK_F21},
+        {"F22", VK_F22},
+        {"F23", VK_F23},
+        {"F24", VK_F24},
+        {"NUMLOCK", VK_NUMLOCK},
+        {"SCROLL", VK_SCROLL},
+        {"LSHIFT", VK_LSHIFT},
+        {"RSHIFT", VK_RSHIFT},
+        {"LCONTROL", VK_LCONTROL},
+        {"RCONTROL", VK_RCONTROL},
+        {"LMENU", VK_LMENU},
+        {"RMENU", VK_RMENU},
+        {"BROWSER_BACK", VK_BROWSER_BACK},
+        {"BROWSER_FORWARD", VK_BROWSER_FORWARD},
+        {"BROWSER_REFRESH", VK_BROWSER_REFRESH},
+        {"BROWSER_STOP", VK_BROWSER_STOP},
+        {"BROWSER_SEARCH", VK_BROWSER_SEARCH},
+        {"BROWSER_FAVORITES", VK_BROWSER_FAVORITES},
+        {"BROWSER_HOME", VK_BROWSER_HOME},
+        {"VOLUME_MUTE", VK_VOLUME_MUTE},
+        {"VOLUME_DOWN", VK_VOLUME_DOWN},
+        {"VOLUME_UP", VK_VOLUME_UP},
+        {"MEDIA_NEXT_TRACK", VK_MEDIA_NEXT_TRACK},
+        {"MEDIA_PREV_TRACK", VK_MEDIA_PREV_TRACK},
+        {"MEDIA_STOP", VK_MEDIA_STOP},
+        {"MEDIA_PLAY_PAUSE", VK_MEDIA_PLAY_PAUSE},
+        {"LAUNCH_MAIL", VK_LAUNCH_MAIL},
+        {"LAUNCH_MEDIA_SELECT", VK_LAUNCH_MEDIA_SELECT},
+        {"LAUNCH_APP1", VK_LAUNCH_APP1},
+        {"LAUNCH_APP2", VK_LAUNCH_APP2},
+        {"OEM_PLUS", VK_OEM_PLUS},
+        {"OEM_COMMA", VK_OEM_COMMA},
+        {"OEM_MINUS", VK_OEM_MINUS},
+        {"OEM_PERIOD", VK_OEM_PERIOD},
+        {";", VK_OEM_1},
+        {"/", VK_OEM_2},
+        {"~", VK_OEM_3},
+        {"[", VK_OEM_4},
+        {"\\", VK_OEM_5},
+        {"]", VK_OEM_6},
+        {"'", VK_OEM_7},
+        {"PROCESSKEY", VK_PROCESSKEY},
+        {"ATTN", VK_ATTN},
+        {"CRSEL", VK_CRSEL},
+        {"EXSEL", VK_EXSEL},
+        {"EREOF", VK_EREOF},
+        {"PLAY", VK_PLAY},
+        {"ZOOM", VK_ZOOM},
+        {"PA1", VK_PA1},
+        {"OEM_CLEAR", VK_OEM_CLEAR},
+    };
+
+    mods = 0;
+    char str[256];
+    strcpy(str, name);
+    for (auto *c = str; *c != 0; c++) { *c = (char)std::toupper(*c); }
+    auto *cur = str;
+    uint32_t ret = 0;
+    for (;;) {
+        auto *spl = strchr(cur, '+');
+        if (spl != nullptr) {
+            *spl = 0;
         }
-        retrievedWindowHandle = true;
-    }
-
-    if (muWindow != nullptr && muWindow != GetForegroundWindow()) {
-        return false;
-    }
-
-    size_t numKeys = keys.size();
-    size_t numKeysBeingPressed = 0;
-
-    if (checkController) {
-        for (DWORD controllerIndex = 0; controllerIndex < XUSER_MAX_COUNT; controllerIndex++) {
-            XINPUT_STATE state = {0};
-            DWORD result = XInputGetState(controllerIndex, &state);
-            if (result == ERROR_SUCCESS) {
-                for (auto key: keys) {
-                    if ((key & state.Gamepad.wButtons) == key) {
-                        numKeysBeingPressed++;
-                    }
-                }
+        bool found = false;
+        for (const auto &m: sModMap) {
+            if (strcmp(cur, m.name) == 0) {
+                mods |= m.keyId;
+                found = true;
+                break;
             }
         }
-    } else {
-        for (auto key: keys) {
-            if (GetAsyncKeyState(key)) {
-                numKeysBeingPressed++;
+        if (found) continue;
+        for (const auto &v: sVKeyMap) {
+            if (strcmp(cur, v.name) == 0) {
+                ret = v.keyId;
+                found = true;
+                break;
             }
         }
-    }
-
-    auto iterator = std::find(notReleasedKeys.begin(), notReleasedKeys.end(), keys);
-    bool keysBeingHeld = iterator != notReleasedKeys.end();
-    if (numKeysBeingPressed == numKeys) {
-        if (keysBeingHeld) {
-            if (falseWhileHolding) {
-                return false;
-            }
-        } else {
-            notReleasedKeys.push_back(keys);
+        if (!found) {
+            log(L"Unknown key name: %hs\n", cur);
         }
-    } else {
-        if (keysBeingHeld) {
-            notReleasedKeys.erase(iterator);
-        }
-        return false;
+        if (spl == nullptr) break;
+        cur = spl + 1;
     }
-
-    return true;
+    return ret;
 }
-
-inline bool IsKeyPressed(unsigned short key, bool falseWhileHolding = true, bool checkController = false) {
-    return IsKeyPressed({key}, falseWhileHolding, checkController);
-}
-*/
 
 }

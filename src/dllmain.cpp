@@ -1,5 +1,6 @@
 #include "mods/moddef.h"
 #include <Windows.h>
+#include <clocale>
 
 DWORD WINAPI MainThread(LPVOID) {
     Mods::modList.loadAll();

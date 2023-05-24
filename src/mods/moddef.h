@@ -16,9 +16,9 @@ public:
     virtual void unload() = 0;
     [[nodiscard]] bool enabled() const { return enabled_; }
     inline void disable() { enabled_ = false; }
-    [[nodiscard]] inline int order() const { return order_; }
-    inline void setOrder(int o) { order_ = o; }
-    inline void setDelayed(int d) { order_ = 0x70000000 + d; }
+    [[nodiscard]] inline int priority() const { return priority_; }
+    inline void setPriority(int o) { priority_ = o; }
+    inline void setDelayed(int d) { priority_ = 0x70000000 + d; }
     void addConfig(const char *name, const char *value);
     [[nodiscard]] const char *config(const char *name) const;
     [[nodiscard]] float configByFloat(const char *name) const;
@@ -35,7 +35,7 @@ protected:
 
 private:
     bool enabled_ = true;
-    int order_ = 0;
+    int priority_ = 0;
 };
 
 class ModList final {

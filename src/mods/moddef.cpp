@@ -59,8 +59,8 @@ void ModList::loadAll() {
         uint32_t delayInMs;
     } modLoadCarry = { {0}, nullptr, false, 0 };
     wchar_t path[MAX_PATH];
-    _snwprintf(path, MAX_PATH, L"%s\\%s.ini", ModUtils::getModulePath(), ModUtils::getModuleName());
-    ModUtils::log(L"Loading config file: %s", path);
+    _snwprintf(path, MAX_PATH, L"%ls\\%ls.ini", ModUtils::getModulePath(), ModUtils::getModuleName());
+    ModUtils::log(L"Loading config file: %ls", path);
     FILE *f = _wfopen(path, L"r");
     if (f == nullptr) return;
     ini_parse_file(f, [](void *userp, const char *section, const char *name, const char *value) {
@@ -83,7 +83,7 @@ void ModList::loadAll() {
                 }
                 if (!found) {
                     modLoadCarry->lastMod = nullptr;
-                    ModUtils::log(L"Mod %S not found, skipping...", section);
+                    ModUtils::log(L"Mod %hs not found, skipping...", section);
                 }
             }
         }
@@ -96,8 +96,8 @@ void ModList::loadAll() {
                 if (!strcmp(value, "0") || !strcmp(value, "false")) {
                     modLoadCarry->lastMod->disable();
                 }
-            } else if (!strcmp(name, "order")) {
-                modLoadCarry->lastMod->setOrder(strtol(value, nullptr, 0));
+            } else if (!strcmp(name, "priority")) {
+                modLoadCarry->lastMod->setPriority(strtol(value, nullptr, 0));
             } else if (!strcmp(name, "delay")) {
                 modLoadCarry->lastMod->setDelayed(strtol(value, nullptr, 0));
             } else {
@@ -108,11 +108,11 @@ void ModList::loadAll() {
     }, &modLoadCarry);
     fclose(f);
     qsort(mods_, modsSize_, sizeof(ModBase *), [](const void *a, const void *b) {
-        auto orderA = (*(ModBase**)a)->order();
-        auto orderB = (*(ModBase**)b)->order();
-        if (orderA == orderB)
+        auto priorityA = (*(ModBase **)a)->priority();
+        auto priorityB = (*(ModBase **)b)->priority();
+        if (priorityA == priorityB)
             return strcmp((*(ModBase**)a)->name(), (*(ModBase**)b)->name());
-        return orderA - orderB;
+        return priorityA - priorityB;
     });
     if (modLoadCarry.delayInMs) {
         ModUtils::log(L"Delay %u ms for mod loading...", modLoadCarry.delayInMs);
@@ -122,16 +122,16 @@ void ModList::loadAll() {
     for (size_t i = 0; i < modsSize_; i++) {
         auto *mod = mods_[i];
         if (!mod->enabled()) continue;
-        if (mod->order() > 0x70000000) {
-            auto delay = mod->order() - 0x70000000;
+        if (mod->priority() > 0x70000000) {
+            auto delay = mod->priority() - 0x70000000;
             auto d = delay - lastDelay;
             if (d) {
-                ModUtils::log(L"Delay %d ms for %S...", d, mod->name());
+                ModUtils::log(L"Delay %d ms for %hs...", d, mod->name());
                 Sleep(d);
             }
             lastDelay = delay;
         }
-        ModUtils::log(L"Loading %S...", mod->name());
+        ModUtils::log(L"Loading %hs...", mod->name());
         mod->load();
     }
     ModUtils::closeLog();
