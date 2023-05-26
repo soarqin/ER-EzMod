@@ -38,7 +38,7 @@ extern void patch(uintptr_t address, const uint8_t *newBytes, size_t newBytesSiz
 extern uintptr_t scanAndPatch(const uint16_t *pattern, size_t size, intptr_t offset, const uint8_t *newBytes, size_t newBytesSize, uint8_t *oldBytes = nullptr);
 
 // Attempts different methods to get the main window handle.
-extern bool getWindowHandle();
+extern bool getWindowHandle(uint32_t *threadId = nullptr);
 
 // Read memory after changing the permission.
 extern void memReadSafe(uintptr_t addr, void *data, size_t numBytes);

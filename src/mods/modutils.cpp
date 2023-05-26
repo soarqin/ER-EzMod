@@ -233,15 +233,16 @@ uintptr_t scanAndPatch(const uint16_t *pattern, size_t size, intptr_t offset, co
 }
 
 // Winapi callback that receives all active window handles one by one.
-inline BOOL CALLBACK enumWindowHandles(HWND hwnd, LPARAM) {
+inline BOOL CALLBACK enumWindowHandles(HWND hwnd, LPARAM lParam) {
     DWORD processId = 0;
-    GetWindowThreadProcessId(hwnd, &processId);
+    auto thId = GetWindowThreadProcessId(hwnd, &processId);
     if (processId == GetCurrentProcessId()) {
         wchar_t buffer[100];
         GetWindowTextW(hwnd, buffer, 100);
         logDebug(L"Found window belonging to ER: %ls", buffer);
-        if (wcsstr(buffer, L"ELDEN RING") != nullptr) {
+        if (wcsstr(buffer, L"ELDEN RING™") != nullptr) {
             logDebug(L"%ls handle selected", buffer);
+            if (lParam) *(uint32_t*)lParam = thId;
             muWindow = hwnd;
             return false;
         }
@@ -250,16 +251,17 @@ inline BOOL CALLBACK enumWindowHandles(HWND hwnd, LPARAM) {
 }
 
 // Attempts different methods to get the main window handle.
-bool getWindowHandle() {
+bool getWindowHandle(uint32_t *threadId) {
     logDebug(L"Finding application window...");
 
     for (size_t i = 0; i < 10000; i++) {
         HWND hwnd = FindWindowExW(nullptr, nullptr, nullptr, L"ELDEN RING™");
         DWORD processId = 0;
-        GetWindowThreadProcessId(hwnd, &processId);
+        auto thId = GetWindowThreadProcessId(hwnd, &processId);
         if (processId == GetCurrentProcessId()) {
             muWindow = hwnd;
-            logDebug(L"FindWindowExA: found window handle");
+            if (threadId) *threadId = thId;
+            logDebug(L"FindWindowExW: found window handle");
             break;
         }
         Sleep(1);
@@ -269,7 +271,7 @@ bool getWindowHandle() {
     if (muWindow == nullptr) {
         logDebug(L"Enumerating windows...");
         for (size_t i = 0; i < 10000; i++) {
-            EnumWindows(&enumWindowHandles, 0L);
+            EnumWindows(&enumWindowHandles, (LPARAM)threadId);
             if (muWindow != nullptr) {
                 break;
             }
@@ -382,11 +384,19 @@ uint32_t mapStringToVKey(const char *name, uint32_t &mods) {
         uint32_t keyId;
     };
     static const KeyMap sModMap[] = {
-        {"SHIFT", MOD_SHIFT},
-        {"CONTROL", MOD_CONTROL},
-        {"CTRL", MOD_CONTROL},
-        {"ALT", MOD_ALT},
-        {"WIN", MOD_WIN},
+        {"SHIFT", 0x01},
+        {"CONTROL", 0x02},
+        {"CTRL", 0x02},
+        {"ALT", 0x04},
+        {"LSHIFT", 0x10},
+        {"LCONTROL", 0x20},
+        {"LCTRL", 0x20},
+        {"LALT", 0x40},
+        {"RSHIFT", 0x100},
+        {"RCONTROL", 0x200},
+        {"RCTRL", 0x200},
+        {"RALT", 0x400},
+        {"WIN", 0x1000},
     };
 
     static const KeyMap sVKeyMap[] = {
@@ -523,10 +533,6 @@ uint32_t mapStringToVKey(const char *name, uint32_t &mods) {
         {"F24", VK_F24},
         {"NUMLOCK", VK_NUMLOCK},
         {"SCROLL", VK_SCROLL},
-        {"LSHIFT", VK_LSHIFT},
-        {"RSHIFT", VK_RSHIFT},
-        {"LCONTROL", VK_LCONTROL},
-        {"RCONTROL", VK_RCONTROL},
         {"LMENU", VK_LMENU},
         {"RMENU", VK_RMENU},
         {"BROWSER_BACK", VK_BROWSER_BACK},
@@ -588,16 +594,17 @@ uint32_t mapStringToVKey(const char *name, uint32_t &mods) {
                 break;
             }
         }
-        if (found) continue;
-        for (const auto &v: sVKeyMap) {
-            if (strcmp(cur, v.name) == 0) {
-                ret = v.keyId;
-                found = true;
-                break;
-            }
-        }
         if (!found) {
-            log(L"Unknown key name: %hs\n", cur);
+            for (const auto &v: sVKeyMap) {
+                if (strcmp(cur, v.name) == 0) {
+                    ret = v.keyId;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                log(L"Unknown key name: %hs\n", cur);
+            }
         }
         if (spl == nullptr) break;
         cur = spl + 1;
