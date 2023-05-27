@@ -141,6 +141,8 @@ void ModList::loadAll() {
 }
 
 void ModList::checkKeyPress(uint32_t vkey) {
+    ModBase *modToToggle[16];
+    size_t modToToggleSize = 0;
     for (size_t i = 0; i < modsSize_; i++) {
         auto *mod = mods_[i];
         if (mod->vkey() == vkey) {
@@ -176,17 +178,21 @@ void ModList::checkKeyPress(uint32_t vkey) {
                 continue;
             }
             ModUtils::log(L"Shortcut for %hs pressed...", mod->name());
-            if (mod->enabled()) {
-                ModUtils::log(L"Unloading %hs...", mod->name());
-                mod->unload();
-                mod->disable();
-                Beep(350, 300);
-            } else {
-                ModUtils::log(L"Loading %hs...", mod->name());
-                mod->load();
-                mod->enable();
-                Beep(550, 300);
-            }
+            modToToggle[modToToggleSize++] = mod;
+        }
+    }
+    for (size_t i = 0; i < modToToggleSize; i++) {
+        auto *mod = modToToggle[i];
+        if (mod->enabled()) {
+            ModUtils::log(L"Unloading %hs...", mod->name());
+            mod->unload();
+            mod->disable();
+            Beep(350, 300);
+        } else {
+            ModUtils::log(L"Loading %hs...", mod->name());
+            mod->load();
+            mod->enable();
+            Beep(550, 300);
         }
     }
 }
