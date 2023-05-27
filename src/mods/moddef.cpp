@@ -143,7 +143,7 @@ void ModList::loadAll() {
 void ModList::checkKeyPress(uint32_t vkey) {
     ModBase *modToToggle[16];
     size_t modToToggleSize = 0;
-    for (size_t i = 0; i < modsSize_; i++) {
+    for (size_t i = 0; i < modsSize_ && modToToggleSize < 16; i++) {
         auto *mod = mods_[i];
         if (mod->vkey() == vkey) {
             auto modkey = mod->modkey();
