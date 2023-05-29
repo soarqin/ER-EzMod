@@ -15,8 +15,14 @@ Modulized mod for Elden Ring: A integrated mod that embeds some useful mods and 
 * `SummonAnywhere`: Summon spirit ashes anywhere.
 
 ## Usage
-* Use [Elden Ring Mod Loader](https://github.com/techiew/EldenRingModLoader) to load this mod.
-* Put `EzMod.ini` in `mods\\config` folder.
+* Use [Elden Ring Mod Loader](https://github.com/techiew/EldenRingModLoader) or [ModEngine2](https://github.com/soulsmods/ModEngine2) to load this mod.
+  * `Elden Ring Mod Loader`
+    * Put `EzMod.dll` in `mods` folder inside Elden Ring `Game` folder.
+  * `ModEngine2`:
+    * Put `EzMod.dll` in any folder.
+    * Add full/relative path to `external_dlls` inside `config_eldenring.toml` inside Elden Ring `Game` folder.
+    * Uncomment `delay` in section `[EzMod]` inside `EzMod.ini`.
+* Put `EzMod.ini` along with `EzMod.dll` in the same folder.
 
 ## Credits
 * [Elden Ring Mod Loader](https://www.nexusmods.com/eldenring/mods/117)

@@ -32,10 +32,13 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     RUNTIME_OUTPUT_NAME "EzMod")
 
 install(DIRECTORY ../config/
-    DESTINATION mods/config
+    DESTINATION .
+    )
+install(FILES ../README.md ../LICENSE
+    DESTINATION .
     )
 install(TARGETS ${PROJECT_NAME}
-    RUNTIME DESTINATION mods
+    RUNTIME DESTINATION .
     )
 string(TIMESTAMP CPACK_PACKAGE_VERSION "%Y%m%d" UTC)
 set(CPACK_GENERATOR "ZIP")
