@@ -10,9 +10,9 @@ Modulized mod for Elden Ring: A integrated mod that embeds some useful mods and 
 * `DropRate`: Set item drop rate.
 * `RuneRate`: Set rune drop rate.
 * `CharFlags`: Set cheat flags, check EzMod.ini for details.
-* `Insensible`: Hide from enemy's sight, unless you attack them first.
 * `NoHitbox`: No hitbox while being attacked.
-* `RideAnywhere`: Ride anywhere, except on some highlands.
+* `RideAnywhere`: Ride anywhere, except in some special places.
+* `SummonAnywhere`: Summon spirit ashes anywhere.
 
 ## Usage
 * Use [Elden Ring Mod Loader](https://github.com/techiew/EldenRingModLoader) to load this mod.
