@@ -16,10 +16,10 @@ struct FlagArray2 {
 };
 #pragma pack(pop)
 
-static uintptr_t patchAddr = 0;
+static uintptr_t scanAddr = 0;
 
 MOD_LOAD(CharFlags) {
-    if (patchAddr == 0) {
+    if (scanAddr == 0) {
         uint16_t pattern[] = {
             0x80, 0x3D, MASKED, MASKED, MASKED, MASKED, 0x00, 0x0F,
             0x85, MASKED, MASKED, MASKED, MASKED, 0x32, 0xC0, 0x48
@@ -27,7 +27,7 @@ MOD_LOAD(CharFlags) {
         auto addr = ModUtils::sigScan(pattern, countof(pattern));
         if (addr == 0) return;
         addr = addr + *(uint32_t *)(addr + 2) + 7;
-        patchAddr = addr;
+        scanAddr = addr;
     }
     FlagArray newArray = {
         configByInt("noDead") != 0,
@@ -38,19 +38,18 @@ MOD_LOAD(CharFlags) {
         configByInt("noFPCost") != 0,
         configByInt("noArrowCost") != 0
     };
-    ModUtils::patch(patchAddr, (const uint8_t *)&newArray, 7);
+    ModUtils::patch(scanAddr, (const uint8_t *)&newArray, 7);
     FlagArray2 newArray2 = {
         configByInt("playerHide") != 0,
         configByInt("playerSilence") != 0
     };
-    ModUtils::patch(patchAddr + 8, (const uint8_t *)&newArray2, 2);
+    ModUtils::patch(scanAddr + 8, (const uint8_t *)&newArray2, 2);
 }
 
 MOD_UNLOAD(CharFlags) {
-    if (patchAddr == 0) return;
+    if (scanAddr == 0) return;
     FlagArray newArray = {0};
-    ModUtils::patch(patchAddr, (const uint8_t *)&newArray, 7);
+    ModUtils::patch(scanAddr, (const uint8_t *)&newArray, 7);
     FlagArray2 newArray2 = {0};
-    ModUtils::patch(patchAddr + 8, (const uint8_t *)&newArray2, 2);
-    patchAddr = 0;
+    ModUtils::patch(scanAddr + 8, (const uint8_t *)&newArray2, 2);
 }

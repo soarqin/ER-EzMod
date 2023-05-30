@@ -13,6 +13,12 @@ MOD_LOAD(SummonAnywhere) {
             0x48, 0x8b, 0x47, MASKED, 0xf3, 0x0f, 0x10, 0x90,
             MASKED, MASKED, MASKED, MASKED, 0x0f, 0x2f, 0xd0,
         };
+        auto addr = ModUtils::sigScan(pattern, countof(pattern));
+        if (addr == 0) return;
+        scanAddr = addr;
+    }
+    if (patchAddr == 0)
+    {
         uint8_t patchCodes[] = {
             // mov rax,[rdi+28]
             0x48, 0x8B, 0x47, 0x28,
@@ -31,11 +37,8 @@ MOD_LOAD(SummonAnywhere) {
             // db float 1000.0
             0x00, 0x00, 0x7A, 0x44,
         };
-        auto addr = ModUtils::sigScan(pattern, countof(pattern));
-        if (addr == 0) return;
-        scanAddr = addr;
-        patchAddr = ModUtils::allocMemoryNear(addr, sizeof(patchCodes));
-        *(uint32_t *)&patchCodes[35] = (uint32_t)(addr + 12 - (patchAddr + 34 + 5));
+        patchAddr = ModUtils::allocMemoryNear(scanAddr, sizeof(patchCodes));
+        *(uint32_t *)&patchCodes[35] = (uint32_t)(scanAddr + 12 - (patchAddr + 34 + 5));
         memcpy((void *)patchAddr, patchCodes, sizeof(patchCodes));
     }
     ModUtils::hookAsmManually(scanAddr, 12, patchAddr, oldBytes);
@@ -44,6 +47,11 @@ MOD_LOAD(SummonAnywhere) {
             0x48, 0x8B, 0x45, 0x98, 0x48, 0x85, 0xC0, 0x0F,
             0x84, MASKED, MASKED, MASKED, MASKED, 0x8B, 0x40, 0x20,
         };
+        auto addr = ModUtils::sigScan(pattern, countof(pattern));
+        if (addr == 0) return;
+        scanAddr2 = addr;
+    }
+    if (patchAddr2 == 0) {
         uint8_t patchCodes[] = {
             // mov rax,[rbp-68]
             0x48, 0x8B, 0x45, 0x98,
@@ -60,11 +68,8 @@ MOD_LOAD(SummonAnywhere) {
             // jmp [return addr]
             0xE9, 0x00, 0x00, 0x00, 0x00,
         };
-        auto addr = ModUtils::sigScan(pattern, countof(pattern));
-        if (addr == 0) return;
-        scanAddr2 = addr;
-        patchAddr2 = ModUtils::allocMemoryNear(addr, sizeof(patchCodes));
-        *(uint32_t *)&patchCodes[30] = (uint32_t)(addr + 7 - (patchAddr2 + 29 + 5));
+        patchAddr2 = ModUtils::allocMemoryNear(scanAddr2, sizeof(patchCodes));
+        *(uint32_t *)&patchCodes[30] = (uint32_t)(scanAddr2 + 7 - (patchAddr2 + 29 + 5));
         memcpy((void *)patchAddr2, patchCodes, sizeof(patchCodes));
     }
     ModUtils::hookAsmManually(scanAddr2, 7, patchAddr2, oldBytes2);
@@ -73,14 +78,8 @@ MOD_LOAD(SummonAnywhere) {
 MOD_UNLOAD(SummonAnywhere) {
     if (scanAddr != 0) {
         ModUtils::memCopySafe(scanAddr, (uintptr_t)oldBytes, 12);
-        scanAddr = 0;
-        ModUtils::freeMemory(patchAddr);
-        patchAddr = 0;
     }
     if (scanAddr2 != 0) {
         ModUtils::memCopySafe(scanAddr2, (uintptr_t)oldBytes2, 7);
-        scanAddr2 = 0;
-        ModUtils::freeMemory(patchAddr2);
-        patchAddr2 = 0;
     }
 }
