@@ -14,6 +14,7 @@ add_library(${PROJECT_NAME} SHARED
     mods/fasterrespawn.cpp
     mods/nohitbox.cpp
     mods/noruneloss.cpp
+    mods/pausegame.cpp
     mods/removechromaticaberration.cpp
     mods/removevignette.cpp
     mods/rideanywhere.cpp

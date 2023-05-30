@@ -13,6 +13,7 @@ Modulized mod for Elden Ring: A integrated mod that embeds some useful mods and 
 * `NoHitbox`: No hitbox while being attacked.
 * `RideAnywhere`: Ride anywhere, except in some special places.
 * `SummonAnywhere`: Summon spirit ashes anywhere.
+* `PauseGame`: Pause game, set key shortcut to toggle.
 
 ## Usage
 * Use [Elden Ring Mod Loader](https://github.com/techiew/EldenRingModLoader) or [ModEngine2](https://github.com/soulsmods/ModEngine2) to load this mod.
