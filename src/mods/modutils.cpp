@@ -1,7 +1,5 @@
 #include "modutils.h"
 
-#include <fileapi.h>
-#include <Psapi.h>
 #include <xinput.h>
 #include <cstdarg>
 #include <share.h>
@@ -14,19 +12,12 @@ static wchar_t muModuleName[MAX_PATH] = {0};
 static HWND muWindow = nullptr;
 static FILE *muLogFile = nullptr;
 static bool muLogOpened = false;
-static CRITICAL_SECTION globalCS = {};
+static HMODULE mainModuleHandle = nullptr;
 
 void init() {
-    InitializeCriticalSection(&globalCS);
-}
-
-// Gets the name of the .dll which the mod code is running in
-void calcModuleName() {
-    if (muModuleName[0] != 0) return;
     static wchar_t lpFilename[MAX_PATH];
     static wchar_t dummy = L'x';
     HMODULE module = nullptr;
-
     GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
                        &dummy,
                        &module);
@@ -39,31 +30,25 @@ void calcModuleName() {
     if (pos != nullptr) *pos = 0;
     lstrcpyW(muModulePath, lpFilename);
     lstrcpyW(muModuleName, moduleName);
+
+    int retry = 3;
+    do {
+        mainModuleHandle = GetModuleHandleW(L"eldenring.exe");
+        if (mainModuleHandle) break;
+        Sleep(500);
+    } while (retry-- > 0);
 }
 
 const wchar_t *getModulePath() {
-    calcModuleName();
     return muModulePath;
 }
 
 const wchar_t *getModuleName() {
-    calcModuleName();
     return muModuleName;
-}
-
-// Gets the path to the current mod relative to the game root folder
-inline const wchar_t *getModuleFolderPath() {
-    calcModuleName();
-
-    static wchar_t lpFullPath[MAX_PATH];
-    _snwprintf(lpFullPath, MAX_PATH, L"mods\\%ls", muModuleName);
-    return lpFullPath;
 }
 
 // Logs both to std::out and to a log file simultaneously
 void log(const wchar_t *msg, ...) {
-    calcModuleName();
-
     if (muLogFile == nullptr && !muLogOpened) {
         wchar_t path[MAX_PATH];
         _snwprintf(path, MAX_PATH, L"%ls\\%ls.log", muModulePath, muModuleName);
@@ -99,25 +84,9 @@ inline void raiseError(const wchar_t *error) {
     MessageBoxW(nullptr, error, muModuleName, MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
 }
 
-// Gets the base address of the game's memory.
-inline DWORD_PTR getModuleBaseAddress(const wchar_t *moduleName) {
-    EnterCriticalSection(&globalCS);
-    static HMODULE module = nullptr;
-    if (!module) {
-        int retry = 3;
-        do {
-            module = GetModuleHandleW(moduleName);
-            if (module) break;
-            Sleep(500);
-        } while (retry-- > 0);
-    }
-    LeaveCriticalSection(&globalCS);
-    return (DWORD_PTR)module;
-}
-
 // Scans the whole memory of the main process module for the given signature.
 uintptr_t sigScan(const uint16_t *pattern, size_t size) {
-    auto *regionStart = (uint8_t*)getModuleBaseAddress(L"eldenring.exe");
+    auto *regionStart = (uint8_t*)mainModuleHandle;
     logDebug(L"Scan in exe:");
     logDebug(L"  Process base address: 0x%llX", regionStart);
 
