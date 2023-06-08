@@ -10,6 +10,7 @@ LRESULT wndHookproc(int code, WPARAM wParam, LPARAM lParam) {
 }
 
 DWORD WINAPI MainThread(LPVOID) {
+    ModUtils::init();
     Mods::modList.loadAll();
     uint32_t thId = 0;
     ModUtils::getWindowHandle(&thId);

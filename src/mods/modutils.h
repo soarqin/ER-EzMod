@@ -10,6 +10,8 @@ enum :uint16_t {
 
 namespace ModUtils {
 
+extern void init();
+
 // Gets the path of the .dll which the mod code is running in
 extern const wchar_t *getModulePath();
 

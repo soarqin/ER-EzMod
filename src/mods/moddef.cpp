@@ -56,8 +56,7 @@ void ModList::loadAll() {
         char lastSection[64];
         ModBase *lastMod;
         bool isCommon;
-        uint32_t delayInMs;
-    } modLoadCarry = {{0}, nullptr, false, 0};
+    } modLoadCarry = {{0}, nullptr, false};
     wchar_t path[MAX_PATH];
     _snwprintf(path, MAX_PATH, L"%ls\\%ls.ini", ModUtils::getModulePath(), ModUtils::getModuleName());
     ModUtils::log(L"Loading config file: %ls", path);
@@ -68,6 +67,7 @@ void ModList::loadAll() {
         if (modLoadCarry->lastSection[0] == 0 || strcmp(modLoadCarry->lastSection, section) != 0) {
             strncpy(modLoadCarry->lastSection, section, 64);
             if (strcmp(section, "EzMod") == 0) {
+                /* Reserved for future use */
                 modLoadCarry->isCommon = true;
                 modLoadCarry->lastMod = nullptr;
             } else {
@@ -88,9 +88,7 @@ void ModList::loadAll() {
             }
         }
         if (modLoadCarry->isCommon) {
-            if (!strcmp(name, "delay")) {
-                modLoadCarry->delayInMs = strtoul(value, nullptr, 0);
-            }
+            /* Reserved for future use */
         } else if (modLoadCarry->lastMod) {
             if (!strcmp(name, "enabled")) {
                 if (!strcmp(value, "0") || !strcmp(value, "false")) {
@@ -118,10 +116,6 @@ void ModList::loadAll() {
             return strcmp((*(ModBase **)a)->name(), (*(ModBase **)b)->name());
         return priorityA - priorityB;
     });
-    if (modLoadCarry.delayInMs) {
-        ModUtils::log(L"Delay %u ms for mod loading...", modLoadCarry.delayInMs);
-        Sleep(modLoadCarry.delayInMs);
-    }
     int lastDelay = 0;
     for (size_t i = 0; i < modsSize_; i++) {
         auto *mod = mods_[i];

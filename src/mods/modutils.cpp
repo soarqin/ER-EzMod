@@ -14,6 +14,11 @@ static wchar_t muModuleName[MAX_PATH] = {0};
 static HWND muWindow = nullptr;
 static FILE *muLogFile = nullptr;
 static bool muLogOpened = false;
+static CRITICAL_SECTION globalCS = {};
+
+void init() {
+    InitializeCriticalSection(&globalCS);
+}
 
 // Gets the name of the .dll which the mod code is running in
 void calcModuleName() {
@@ -95,45 +100,25 @@ inline void raiseError(const wchar_t *error) {
 }
 
 // Gets the base address of the game's memory.
-inline DWORD_PTR getProcessBaseAddress(DWORD processId) {
-    DWORD_PTR baseAddress = 0;
-    HANDLE processHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, processId);
-    HMODULE *moduleArray = nullptr;
-    LPBYTE moduleArrayBytes = nullptr;
-    DWORD bytesRequired = 0;
-
-    if (processHandle) {
-        if (EnumProcessModules(processHandle, nullptr, 0, &bytesRequired)) {
-            if (bytesRequired) {
-                moduleArrayBytes = (LPBYTE)LocalAlloc(LPTR, bytesRequired);
-
-                if (moduleArrayBytes) {
-                    unsigned int moduleCount;
-
-                    moduleCount = bytesRequired / sizeof(HMODULE);
-                    moduleArray = (HMODULE *)moduleArrayBytes;
-
-                    if (EnumProcessModules(processHandle, moduleArray, bytesRequired, &bytesRequired)) {
-                        baseAddress = (DWORD_PTR)moduleArray[0];
-                    }
-
-                    LocalFree(moduleArrayBytes);
-                }
-            }
-        }
-
-        CloseHandle(processHandle);
+inline DWORD_PTR getModuleBaseAddress(const wchar_t *moduleName) {
+    EnterCriticalSection(&globalCS);
+    static HMODULE module = nullptr;
+    if (!module) {
+        int retry = 3;
+        do {
+            module = GetModuleHandleW(moduleName);
+            if (module) break;
+            Sleep(500);
+        } while (retry-- > 0);
     }
-
-    return baseAddress;
+    LeaveCriticalSection(&globalCS);
+    return (DWORD_PTR)module;
 }
 
 // Scans the whole memory of the main process module for the given signature.
 uintptr_t sigScan(const uint16_t *pattern, size_t size) {
-    DWORD processId = GetCurrentProcessId();
-    auto *regionStart = (uint8_t*)getProcessBaseAddress(processId);
+    auto *regionStart = (uint8_t*)getModuleBaseAddress(L"eldenring.exe");
     logDebug(L"Scan in exe:");
-    logDebug(L"  Process ID: %i", processId);
     logDebug(L"  Process base address: 0x%llX", regionStart);
 
 #if !defined(NDEBUG)
@@ -150,62 +135,42 @@ uintptr_t sigScan(const uint16_t *pattern, size_t size) {
     logDebug(L"Pattern: %hs", patternString);
 #endif
 
-    size_t numRegionsChecked = 0;
-    uint8_t *currentAddress = nullptr;
-    while (numRegionsChecked < 10000) {
-        MEMORY_BASIC_INFORMATION memoryInfo = {nullptr};
-        if (VirtualQuery(regionStart, &memoryInfo, sizeof(MEMORY_BASIC_INFORMATION)) == 0) {
-            DWORD error = GetLastError();
-            if (error == ERROR_INVALID_PARAMETER) {
-                logDebug(L"Reached end of scannable memory.");
-            } else {
-                logDebug(L"VirtualQuery failed, error code: %i.", error);
-            }
-            break;
-        }
-        regionStart = (uint8_t*)memoryInfo.BaseAddress;
-        auto regionSize = (size_t)memoryInfo.RegionSize;
-        auto regionEnd = (uint8_t*)(regionStart + regionSize);
-        auto protection = memoryInfo.Protect;
-        auto state = memoryInfo.State;
+    MEMORY_BASIC_INFORMATION memInfo;
+    if (VirtualQuery((void*)regionStart, &memInfo, sizeof(memInfo)) != 0) {
+        auto* dos = (IMAGE_DOS_HEADER*)regionStart;
+        auto* pe = (IMAGE_NT_HEADERS*)((ULONG64)memInfo.AllocationBase + (ULONG64)dos->e_lfanew);
 
-        bool readableMemory = (
-            protection == PAGE_EXECUTE_READWRITE ||
-                protection == PAGE_READWRITE ||
-                protection == PAGE_READONLY ||
-                protection == PAGE_WRITECOPY ||
-                protection == PAGE_EXECUTE_WRITECOPY)
-            && state == MEM_COMMIT;
-
-        if (readableMemory) {
-            logDebug(L"Checking region: 0x%llX", regionStart);
-            currentAddress = regionStart;
-            regionEnd -= size;
-            while (currentAddress < regionEnd) {
-                bool match = true;
-                for (size_t i = 0; i < size; i++) {
-                    if (pattern[i] == MASKED ||
-                        currentAddress[i] == (unsigned char)pattern[i]) {
-                        continue;
+        if ((dos->e_magic == IMAGE_DOS_SIGNATURE) && (pe->Signature == IMAGE_NT_SIGNATURE)) {
+            auto *baseAddress = memInfo.AllocationBase;
+            IMAGE_SECTION_HEADER* sections = IMAGE_FIRST_SECTION(pe);
+            for (int i = 0; i < pe->FileHeader.NumberOfSections; ++i) {
+                if (sections[i].Characteristics & IMAGE_SCN_MEM_EXECUTE) {
+                    logDebug(L"Checking region: 0x%llX", regionStart);
+                    auto *currentAddress = (uint8_t*)baseAddress + sections[i].VirtualAddress;
+                    auto *regionEnd = currentAddress + sections[i].Misc.VirtualSize - size;
+                    while (currentAddress < regionEnd) {
+                        bool match = true;
+                        for (size_t j = 0; j < size; j++) {
+                            if (pattern[j] == MASKED ||
+                                currentAddress[j] == (unsigned char)pattern[j]) {
+                                continue;
+                            }
+                            match = false;
+                            break;
+                        }
+                        if (match) {
+                            logDebug(L"Found signature at 0x%llX", currentAddress);
+                            return (uintptr_t)currentAddress;
+                        }
+                        currentAddress++;
                     }
-                    match = false;
-                    break;
+/*
+                    ExecutableSections.emplace_back((char*)BaseAddress + sections[i].VirtualAddress, sections[i].Misc.VirtualSize);
+*/
                 }
-                if (match) {
-                    logDebug(L"Found signature at 0x%llX", currentAddress);
-                    return (uintptr_t)currentAddress;
-                }
-                currentAddress++;
             }
-        } else {
-            logDebug(L"Skipped region: 0x%llX", regionStart);
         }
-
-        numRegionsChecked++;
-        regionStart += memoryInfo.RegionSize;
     }
-
-    logDebug(L"Stopped at: 0x%llX, num regions checked: %i", currentAddress, numRegionsChecked);
     raiseError(L"Could not find signature!");
     return 0;
 }
