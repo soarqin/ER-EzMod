@@ -9,15 +9,14 @@ static uint8_t oldBytes2[8];
 
 MOD_LOAD(RideAnywhere) {
     if (scanAddr == 0) {
-        uint16_t pattern[] = {
-            0x80, MASKED, MASKED, MASKED, MASKED, MASKED, MASKED, 0x48,
-            MASKED, MASKED, MASKED, MASKED, 0x48, MASKED, MASKED, MASKED,
-            MASKED, MASKED, MASKED, MASKED, MASKED, 0x40, MASKED, MASKED,
-            MASKED, MASKED, MASKED, 0x44, MASKED, MASKED, MASKED, MASKED,
-            MASKED, MASKED, MASKED, 0x48, MASKED, MASKED, MASKED, MASKED,
-            MASKED, MASKED, MASKED, MASKED, 0xE8, MASKED, MASKED, MASKED,
-            MASKED, 0x48};
-        auto addr = ModUtils::sigScan(pattern, countof(pattern));
+        auto addr = ModUtils::sigScan(
+            "80 ?? ?? ?? ?? ?? ?? 48"
+            "?? ?? ?? ?? 48 ?? ?? ??"
+            "?? ?? ?? ?? ?? 40 ?? ??"
+            "?? ?? ?? 44 ?? ?? ?? ??"
+            "?? ?? ?? 48 ?? ?? ?? ??"
+            "?? ?? ?? ?? e8 ?? ?? ??"
+            "?? 48");
         if (addr == 0) return;
         scanAddr = addr;
     }
@@ -34,7 +33,8 @@ MOD_LOAD(RideAnywhere) {
         uint16_t pattern2[] = {
             0x48, 0x8B, 0x40, 0x68, 0x80, 0x78, 0x36, 0x00,
         };
-        auto addr = ModUtils::sigScan(pattern2, countof(pattern2));
+        auto addr = ModUtils::sigScan(
+            "48 8b 40 68 80 78 36 00");
         if (addr == 0) return;
         scanAddr2 = addr;
     }

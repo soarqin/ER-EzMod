@@ -1,8 +1,8 @@
 #include "modutils.h"
 
+#include <share.h>
 #include <xinput.h>
 #include <cstdarg>
-#include <share.h>
 #include <cctype>
 
 namespace ModUtils {
@@ -13,6 +13,11 @@ static HWND muWindow = nullptr;
 static FILE *muLogFile = nullptr;
 static bool muLogOpened = false;
 static HMODULE mainModuleHandle = nullptr;
+static struct {
+    uint8_t *addr;
+    size_t size;
+} virtMemBlocks[256];
+static size_t virtMemBlockCount = 0;
 
 void init() {
     static wchar_t lpFilename[MAX_PATH];
@@ -37,6 +42,23 @@ void init() {
         if (mainModuleHandle) break;
         Sleep(500);
     } while (retry-- > 0);
+
+    auto *regionStart = (uint8_t*)mainModuleHandle;
+    MEMORY_BASIC_INFORMATION memInfo;
+    if (VirtualQuery((void*)regionStart, &memInfo, sizeof(memInfo)) == 0) return;
+
+    auto* dos = (IMAGE_DOS_HEADER*)regionStart;
+    auto* pe = (IMAGE_NT_HEADERS*)((ULONG64)memInfo.AllocationBase + (ULONG64)dos->e_lfanew);
+    if (dos->e_magic != IMAGE_DOS_SIGNATURE || pe->Signature != IMAGE_NT_SIGNATURE) return;
+    auto *baseAddress = memInfo.AllocationBase;
+    IMAGE_SECTION_HEADER* sections = IMAGE_FIRST_SECTION(pe);
+    for (int i = 0; i < pe->FileHeader.NumberOfSections; ++i) {
+        if (!(sections[i].Characteristics & IMAGE_SCN_MEM_EXECUTE)) continue;
+        virtMemBlocks[virtMemBlockCount] = { (uint8_t*)baseAddress + sections[i].VirtualAddress, sections[i].Misc.VirtualSize };
+        if (++virtMemBlockCount >= 256) {
+            break;
+        }
+    }
 }
 
 const wchar_t *getModulePath() {
@@ -79,91 +101,107 @@ void closeLog() {
 }
 
 // Shows a popup with a warning and logs that same warning.
-inline void raiseError(const wchar_t *error) {
-    log(L"Raised error: %ls", error);
-    MessageBoxW(nullptr, error, muModuleName, MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
+inline void raiseError(const wchar_t *error, ...) {
+    va_list args;
+    va_start(args, error);
+    wchar_t msg[1024];
+    _vsnwprintf(msg, 1024, error, args);
+    va_end(args);
+    log(L"Raised error: %ls", msg);
+    MessageBoxW(nullptr, msg, muModuleName, MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
+}
+
+bool patternToBytes(const char *pattern, size_t &size, uint8_t *bytes, uint8_t *mask) {
+    const auto *ptr = pattern;
+#define SKIP_SPACES() while (*ptr == ' ' || *ptr == '\t' || *ptr == '\v' || *ptr == '\r' || *ptr == '\n') ++ptr
+    SKIP_SPACES();
+    size_t sz = 0;
+    if (size == 0) size = (uint32_t)-1;
+    if (mask) {
+        while (*ptr != 0 && sz < size) {
+            if (*ptr == '?' && *(ptr + 1) == '?') {
+                if (mask) *mask++ = 0;
+                *bytes++ = 0;
+                ptr += 2;
+            } else if (isxdigit(*ptr)) {
+                *mask++ = 0xFF;
+                char src[3] = {*ptr, *(ptr + 1), 0};
+                *bytes++ = (uint8_t)strtoul(src, nullptr, 16);
+                ptr += 2;
+            } else {
+                raiseError(L"Invalid pattern: %hs", pattern);
+                return false;
+            }
+            sz++;
+            SKIP_SPACES();
+        }
+    } else {
+        while (*ptr != 0 && sz < size) {
+            if (isxdigit(*ptr)) {
+                char src[3] = {*ptr, *(ptr + 1), 0};
+                *bytes++ = (uint8_t)strtoul(src, nullptr, 16);
+                ptr += 2;
+            } else {
+                raiseError(L"Invalid pattern: %hs", pattern);
+                return false;
+            }
+            sz++;
+            SKIP_SPACES();
+        }
+    }
+#undef SKIP_SPACES
+    size = sz;
+    return true;
 }
 
 // Scans the whole memory of the main process module for the given signature.
-uintptr_t sigScan(const uint16_t *pattern, size_t size) {
-    auto *regionStart = (uint8_t*)mainModuleHandle;
-    logDebug(L"Scan in exe:");
-    logDebug(L"  Process base address: 0x%llX", regionStart);
+uintptr_t sigScan(const char *pattern) {
+    size_t size = strlen(pattern);
+    auto *bytes = (uint8_t*)malloc(size);
+    auto *mask = (uint8_t*)malloc(size);
+    patternToBytes(pattern, size, bytes, mask);
+    auto result = sigScan(bytes, mask, size);
+    free(bytes);
+    free(mask);
+    return result;
+}
 
+uintptr_t sigScan(const uint8_t *pattern, const uint8_t *mask, size_t size) {
 #if !defined(NDEBUG)
     char patternString[1024] = {0};
     size_t offset = 0;
     for (size_t i = 0; i < size && offset < 1024; ++i) {
-        auto byte = pattern[i];
-        if (byte == MASKED) {
-            offset += snprintf(patternString + offset, 1024 - offset, " ?");
+        if (mask[i] == 0) {
+            offset += snprintf(patternString + offset, 1024 - offset, " ??");
         } else {
-            offset += snprintf(patternString + offset, 1024 - offset, " 0x%02X", byte);
+            offset += snprintf(patternString + offset, 1024 - offset, " %02x", pattern[i]);
         }
     }
-    logDebug(L"Pattern: %hs", patternString);
+    log(L"Scanning pattern: %hs", patternString);
 #endif
 
-    MEMORY_BASIC_INFORMATION memInfo;
-    if (VirtualQuery((void*)regionStart, &memInfo, sizeof(memInfo)) != 0) {
-        auto* dos = (IMAGE_DOS_HEADER*)regionStart;
-        auto* pe = (IMAGE_NT_HEADERS*)((ULONG64)memInfo.AllocationBase + (ULONG64)dos->e_lfanew);
-
-        if ((dos->e_magic == IMAGE_DOS_SIGNATURE) && (pe->Signature == IMAGE_NT_SIGNATURE)) {
-            auto *baseAddress = memInfo.AllocationBase;
-            IMAGE_SECTION_HEADER* sections = IMAGE_FIRST_SECTION(pe);
-            for (int i = 0; i < pe->FileHeader.NumberOfSections; ++i) {
-                if (sections[i].Characteristics & IMAGE_SCN_MEM_EXECUTE) {
-                    logDebug(L"Checking region: 0x%llX", regionStart);
-                    auto *currentAddress = (uint8_t*)baseAddress + sections[i].VirtualAddress;
-                    auto *regionEnd = currentAddress + sections[i].Misc.VirtualSize - size;
-                    while (currentAddress < regionEnd) {
-                        bool match = true;
-                        for (size_t j = 0; j < size; j++) {
-                            if (pattern[j] == MASKED ||
-                                currentAddress[j] == (unsigned char)pattern[j]) {
-                                continue;
-                            }
-                            match = false;
-                            break;
-                        }
-                        if (match) {
-                            logDebug(L"Found signature at 0x%llX", currentAddress);
-                            return (uintptr_t)currentAddress;
-                        }
-                        currentAddress++;
-                    }
-/*
-                    ExecutableSections.emplace_back((char*)BaseAddress + sections[i].VirtualAddress, sections[i].Misc.VirtualSize);
-*/
+    for (size_t i = 0; i < virtMemBlockCount; ++i) {
+        logDebug(L"Checking region: 0x%llX", virtMemBlocks[i]);
+        auto *currentAddress = virtMemBlocks[i].addr;
+        auto *regionEnd = currentAddress + virtMemBlocks[i].size - size;
+        while (currentAddress < regionEnd) {
+            bool match = true;
+            for (size_t j = 0; j < size; j++) {
+                if (!((currentAddress[j] & mask[j]) ^ pattern[j])) {
+                    continue;
                 }
+                match = false;
+                break;
             }
+            if (match) {
+                logDebug(L"Found signature at 0x%llX", currentAddress);
+                return (uintptr_t)currentAddress;
+            }
+            currentAddress++;
         }
     }
     raiseError(L"Could not find signature!");
     return 0;
-}
-
-// Replaces the memory at a given address with newBytes.
-void patch(uintptr_t address, const uint8_t *newBytes, size_t newBytesSize, uint8_t *oldBytes) {
-    char newBytesString[1024];
-    size_t offset = 0;
-    size_t index = 0;
-    for (const auto *bytes = newBytes; offset < 1024 && index < newBytesSize; index++) {
-        offset += snprintf(newBytesString + offset, 1024 - offset, " 0x%02X", bytes[index]);
-    }
-    logDebug(L"New bytes: %hs", newBytesString);
-
-    if (oldBytes) memcpy(oldBytes, (void *)address, newBytesSize);
-    memcpy((void *)address, newBytes, newBytesSize);
-    logDebug(L"Patch applied");
-}
-
-uintptr_t scanAndPatch(const uint16_t *pattern, size_t size, intptr_t offset, const uint8_t *newBytes, size_t newBytesSize, uint8_t *oldBytes) {
-    auto addr = sigScan(pattern, size);
-    if (addr == 0) return 0;
-    patch(addr + offset, newBytes, newBytesSize, oldBytes);
-    return addr + offset;
 }
 
 // Winapi callback that receives all active window handles one by one.
@@ -224,36 +262,11 @@ inline DWORD toggleMemoryProtection(DWORD protection, uintptr_t address, size_t 
     return oldProtection;
 }
 
-// Read memory after changing the permission.
-void memReadSafe(uintptr_t addr, void *data, size_t numBytes) {
-    auto oldProt = toggleMemoryProtection(PAGE_EXECUTE_READWRITE, addr, numBytes);
-    memcpy(data, (void *)addr, numBytes);
-    toggleMemoryProtection(oldProt, addr, numBytes);
-}
-
-// Copies memory after changing the permissions at both the source and destination, so we don't get an access violation.
+// Copies memory after changing the permissions at destination, to ensure write success.
 void memCopySafe(uintptr_t destination, uintptr_t source, size_t numBytes) {
     auto oldProt0 = toggleMemoryProtection(PAGE_EXECUTE_READWRITE, destination, numBytes);
-    auto oldProt1 = toggleMemoryProtection(PAGE_EXECUTE_READWRITE, source, numBytes);
     memcpy((void *)destination, (void *)source, numBytes);
-    toggleMemoryProtection(oldProt1, source, numBytes);
     toggleMemoryProtection(oldProt0, destination, numBytes);
-}
-
-// Simple wrapper around memset
-void memSetSafe(uintptr_t address, unsigned char byte, size_t numBytes) {
-    auto oldProt = toggleMemoryProtection(PAGE_EXECUTE_READWRITE, address, numBytes);
-    memset((void *)address, byte, numBytes);
-    toggleMemoryProtection(oldProt, address, numBytes);
-}
-
-// Takes a 4-byte relative address and converts it to an absolute 8-byte address.
-uintptr_t relativeToAbsoluteAddress(uintptr_t relativeAddressLocation) {
-    uintptr_t absoluteAddress = 0;
-    intptr_t relativeAddress = 0;
-    memCopySafe((uintptr_t)&relativeAddress, relativeAddressLocation, 4);
-    absoluteAddress = relativeAddressLocation + 4 + relativeAddress;
-    return absoluteAddress;
 }
 
 // Allocate memory block for hook use
@@ -279,8 +292,25 @@ void freeMemory(uintptr_t address) {
     VirtualFree((LPVOID)address, 0, MEM_RELEASE);
 }
 
+// Replaces the memory at a given address with newBytes.
+void patch(uintptr_t address, const uint8_t *newBytes, size_t newBytesSize, uint8_t *oldBytes) {
+#if !defined(NDEBUG)
+    char newBytesString[1024];
+    size_t offset = 0;
+    size_t index = 0;
+    for (const auto *bytes = newBytes; offset < 1024 && index < newBytesSize; index++) {
+        offset += snprintf(newBytesString + offset, 1024 - offset, " %02x", bytes[index]);
+    }
+    log(L"New bytes: %hs", newBytesString);
+#endif
+
+    if (oldBytes) memcpy(oldBytes, (void *)address, newBytesSize);
+    memCopySafe(address, (uintptr_t)newBytes, newBytesSize);
+    logDebug(L"Patch applied");
+}
+
 // Places a 5-byte absolutely rel-jump from A to B, run asm codes and return to A.
-bool hookAsm(uintptr_t address, size_t skipBytes, uint8_t *patchCodes, size_t patchBytes) {
+bool hookAsm(uintptr_t address, size_t skipBytes, uint8_t *patchCodes, size_t patchBytes, uint8_t *oldBytes) {
     if (skipBytes < 5) return false;
     uintptr_t allocAddr = allocMemoryNear(address, patchBytes + 5);
     if (!allocAddr) {
@@ -292,6 +322,7 @@ bool hookAsm(uintptr_t address, size_t skipBytes, uint8_t *patchCodes, size_t pa
     jmp[0] = 0xE9;
     *(uint32_t*)&jmp[1] = (uint32_t)((uintptr_t)allocAddr - address - 5);
     if (skipBytes > 5) memset(jmp + 5, 0x90, skipBytes - 5);
+    if (oldBytes) memcpy(oldBytes, (void *)address, skipBytes);
     memCopySafe(address, (uintptr_t)jmp, skipBytes);
     memcpy((void*)allocAddr, patchCodes, patchBytes);
     auto *jmp2 = (uint8_t*)allocAddr + patchBytes;

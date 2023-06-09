@@ -20,11 +20,9 @@ static uintptr_t scanAddr = 0;
 
 MOD_LOAD(CharFlags) {
     if (scanAddr == 0) {
-        uint16_t pattern[] = {
-            0x80, 0x3D, MASKED, MASKED, MASKED, MASKED, 0x00, 0x0F,
-            0x85, MASKED, MASKED, MASKED, MASKED, 0x32, 0xC0, 0x48
-        };
-        auto addr = ModUtils::sigScan(pattern, countof(pattern));
+        auto addr = ModUtils::sigScan(
+            "80 3d ?? ?? ?? ?? 00 0f"
+            "85 ?? ?? ?? ?? 32 c0 48");
         if (addr == 0) return;
         addr = addr + *(uint32_t *)(addr + 2) + 7;
         scanAddr = addr;

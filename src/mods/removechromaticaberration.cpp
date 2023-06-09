@@ -5,13 +5,12 @@ static uint8_t oldBytes[4];
 
 MOD_LOAD(RemoveChromaticAberration) {
     if (scanAddr == 0) {
-        uint16_t pattern[] = {
-            0x0f, 0x11, MASKED, 0x60, MASKED, 0x8d, MASKED, 0x80,
-            0x00, 0x00, 0x00, 0x0f, 0x10, MASKED, 0xa0, 0x00,
-            0x00, 0x00, 0x0f, 0x11, MASKED, 0xf0, MASKED, 0x8d,
-            MASKED, 0xb0, 0x00, 0x00, 0x00, 0x0f, 0x10, MASKED,
-            0x0f, 0x11, MASKED, 0x0f, 0x10, MASKED, 0x10};
-        auto addr = ModUtils::sigScan(pattern, countof(pattern));
+        auto addr = ModUtils::sigScan(
+            "0f 11 ?? 60 ?? 8d ?? 80"
+            "00 00 00 0f 10 ?? a0 00"
+            "00 00 0f 11 ?? f0 ?? 8d"
+            "?? b0 00 00 00 0f 10 ??"
+            "0f 11 ?? 0f 10 ?? 10");
         if (addr == 0) return;
         scanAddr = addr;
     }

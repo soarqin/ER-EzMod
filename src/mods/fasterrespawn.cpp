@@ -6,12 +6,10 @@ static uintptr_t scanAddr = 0;
 
 MOD_LOAD(FasterRespawn) {
     if (scanAddr == 0) {
-        uint16_t pattern[] = {
-            0x48, 0x89, 0x5C, 0x24, 0x48, 0x8B, 0xFA, 0x48,
-            0x8B, 0xD9, 0xC7, 0x44, 0x24, 0x20, 0x00, 0x00,
-            0x00, 0x00, 0x48
-        };
-        auto addr = ModUtils::sigScan(pattern, countof(pattern));
+        auto addr = ModUtils::sigScan(
+            "48 89 5C 24 48 8B FA 48"
+            "8B D9 C7 44 24 20 00 00"
+            "00 00 48");
         if (addr == 0) return;
         addr = *(uintptr_t *)(addr + 0x19 + *(uint32_t *)(addr + 0x15));
         for (;;) {

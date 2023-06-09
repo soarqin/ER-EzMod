@@ -4,10 +4,6 @@
 
 namespace Mods {
 
-#if !defined(countof)
-#define countof(n) sizeof(n) / sizeof(n[0])
-#endif
-
 class ModBase {
 public:
     virtual ~ModBase();

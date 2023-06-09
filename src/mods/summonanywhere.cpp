@@ -9,11 +9,9 @@ static uint8_t oldBytes2[7];
 
 MOD_LOAD(SummonAnywhere) {
     if (scanAddr == 0) {
-        uint16_t pattern[] = {
-            0x48, 0x8b, 0x47, MASKED, 0xf3, 0x0f, 0x10, 0x90,
-            MASKED, MASKED, MASKED, MASKED, 0x0f, 0x2f, 0xd0,
-        };
-        auto addr = ModUtils::sigScan(pattern, countof(pattern));
+        auto addr = ModUtils::sigScan(
+            "48 8b 47 ?? f3 0f 10 90"
+            "?? ?? ?? ?? 0f 2f d0");
         if (addr == 0) return;
         scanAddr = addr;
     }
@@ -43,11 +41,9 @@ MOD_LOAD(SummonAnywhere) {
     }
     ModUtils::hookAsmManually(scanAddr, 12, patchAddr, oldBytes);
     if (scanAddr2 == 0) {
-        uint16_t pattern[] = {
-            0x48, 0x8B, 0x45, 0x98, 0x48, 0x85, 0xC0, 0x0F,
-            0x84, MASKED, MASKED, MASKED, MASKED, 0x8B, 0x40, 0x20,
-        };
-        auto addr = ModUtils::sigScan(pattern, countof(pattern));
+        auto addr = ModUtils::sigScan(
+            "48 8B 45 98 48 85 C0 0F"
+            "84 ?? ?? ?? ?? 8B 40 20");
         if (addr == 0) return;
         scanAddr2 = addr;
     }

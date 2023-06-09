@@ -6,11 +6,9 @@ static uint8_t oldBytes[8];
 
 MOD_LOAD(RuneRate) {
     if (scanAddr == 0) {
-        uint16_t pattern[] = {
-            0xf3, 0x0f, 0x59, 0xc1, 0xf3, 0x0f, 0x2c, 0xf8,
-            0x48, 0x8b, 0x8b
-        };
-        auto addr = ModUtils::sigScan(pattern, countof(pattern));
+        auto addr = ModUtils::sigScan(
+            "f3 0f 59 c1 f3 0f 2c f8"
+            "48 8b 8b");
         if (addr == 0) return;
         scanAddr = addr;
     }

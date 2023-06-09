@@ -5,11 +5,9 @@ static uint8_t oldBytes[1];
 
 MOD_LOAD(PauseGame) {
     if (scanAddr == 0) {
-        uint16_t pattern[] = {
-            0x80, 0xBB, 0x28, 0x01, 0x00, 0x00, 0x00, 0x0F,
-            0x84,
-        };
-        auto addr = ModUtils::sigScan(pattern, countof(pattern));
+        auto addr = ModUtils::sigScan(
+            "80 BB 28 01 00 00 00 0F"
+            "84");
         if (addr == 0) return;
         scanAddr = addr;
     }
