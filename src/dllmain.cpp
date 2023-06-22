@@ -1,7 +1,7 @@
 #include "mods/moddef.h"
 #include <Windows.h>
 
-LRESULT wndHookproc(int code, WPARAM wParam, LPARAM lParam) {
+LRESULT CALLBACK wndHookproc(int code, WPARAM wParam, LPARAM lParam) {
     if (code != HC_ACTION) return CallNextHookEx(nullptr, code, wParam, lParam);
     if (HIWORD(lParam) & KF_UP) {
         Mods::modList.checkKeyPress((uint32_t)wParam);
@@ -28,7 +28,7 @@ DWORD WINAPI MainThread(LPVOID) {
     return 0;
 }
 
-BOOL WINAPI DllMain(HINSTANCE module, DWORD reason, LPVOID) {
+[[maybe_unused]] BOOL WINAPI DllMain(HINSTANCE module, DWORD reason, LPVOID) {
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(module);
         CreateThread(nullptr, 0, &MainThread, nullptr, 0, nullptr);
